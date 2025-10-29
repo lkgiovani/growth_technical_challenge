@@ -1,10 +1,10 @@
 package departamento
 
 import (
-	"errors"
 	"strings"
 
 	"github.com/google/uuid"
+	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/repository"
 )
@@ -33,14 +33,14 @@ func (u *usecase) GetAllDepartamentos(limit, offset int) ([]entities.Departament
 
 func (u *usecase) GetDepartamentoByID(id uuid.UUID) (*entities.Departamento, error) {
 	if id == uuid.Nil {
-		return nil, errors.New("ID de departamento inválido")
+		return nil, app.Errorf(app.EINVALID, "ID de departamento inválido")
 	}
 	return u.departamentoRepo.FindByID(id)
 }
 
 func (u *usecase) GetDepartamentoWithHierarchy(id uuid.UUID) (*entities.Departamento, error) {
 	if id == uuid.Nil {
-		return nil, errors.New("ID de departamento inválido")
+		return nil, app.Errorf(app.EINVALID, "ID de departamento inválido")
 	}
 	return u.departamentoRepo.FindByIDWithHierarchy(id)
 }
@@ -52,25 +52,25 @@ func (u *usecase) CreateDepartamento(departamento *entities.Departamento) error 
 
 	gerente, err := u.colaboradorRepo.FindByID(departamento.GerenteID)
 	if err != nil {
-		return errors.New("gerente não encontrado")
+		return err
 	}
 	if gerente == nil {
-		return errors.New("gerente não existe")
+		return app.Errorf(app.ENOTFOUND, "gerente não encontrado")
 	}
 
 	if gerente.DepartamentoID != departamento.ID && departamento.ID != uuid.Nil {
 		if gerente.DepartamentoID != departamento.ID {
-			return errors.New("gerente deve pertencer ao mesmo departamento")
+			return app.Errorf(app.EINVALID, "gerente deve pertencer ao mesmo departamento")
 		}
 	}
 
 	if departamento.DepartamentoSuperiorID != nil && *departamento.DepartamentoSuperiorID != uuid.Nil {
 		parentDept, err := u.departamentoRepo.FindByID(*departamento.DepartamentoSuperiorID)
 		if err != nil {
-			return errors.New("departamento superior não encontrado")
+			return err
 		}
 		if parentDept == nil {
-			return errors.New("departamento superior não existe")
+			return app.Errorf(app.ENOTFOUND, "departamento superior não encontrado")
 		}
 
 		if departamento.ID != uuid.Nil {
@@ -79,7 +79,7 @@ func (u *usecase) CreateDepartamento(departamento *entities.Departamento) error 
 				return err
 			}
 			if hasCycle {
-				return errors.New("não é possível criar ciclo na hierarquia de departamentos")
+				return app.Errorf(app.ECONFLICT, "não é possível criar ciclo na hierarquia de departamentos")
 			}
 		}
 	}
@@ -90,7 +90,7 @@ func (u *usecase) CreateDepartamento(departamento *entities.Departamento) error 
 
 func (u *usecase) UpdateDepartamento(id uuid.UUID, departamento *entities.Departamento) error {
 	if id == uuid.Nil {
-		return errors.New("ID de departamento inválido")
+		return app.Errorf(app.EINVALID, "ID de departamento inválido")
 	}
 
 	existingDept, err := u.departamentoRepo.FindByID(id)
@@ -104,27 +104,27 @@ func (u *usecase) UpdateDepartamento(id uuid.UUID, departamento *entities.Depart
 
 	gerente, err := u.colaboradorRepo.FindByID(departamento.GerenteID)
 	if err != nil {
-		return errors.New("gerente não encontrado")
+		return err
 	}
 	if gerente == nil {
-		return errors.New("gerente não existe")
+		return app.Errorf(app.ENOTFOUND, "gerente não encontrado")
 	}
 
 	if gerente.DepartamentoID != id {
-		return errors.New("gerente deve pertencer ao mesmo departamento")
+		return app.Errorf(app.EINVALID, "gerente deve pertencer ao mesmo departamento")
 	}
 
 	if departamento.DepartamentoSuperiorID != nil && *departamento.DepartamentoSuperiorID != uuid.Nil {
 		if *departamento.DepartamentoSuperiorID == id {
-			return errors.New("departamento não pode ser seu próprio superior")
+			return app.Errorf(app.EINVALID, "departamento não pode ser seu próprio superior")
 		}
 
 		parentDept, err := u.departamentoRepo.FindByID(*departamento.DepartamentoSuperiorID)
 		if err != nil {
-			return errors.New("departamento superior não encontrado")
+			return err
 		}
 		if parentDept == nil {
-			return errors.New("departamento superior não existe")
+			return app.Errorf(app.ENOTFOUND, "departamento superior não encontrado")
 		}
 
 		hasCycle, err := u.departamentoRepo.HasCycle(id, *departamento.DepartamentoSuperiorID)
@@ -132,7 +132,7 @@ func (u *usecase) UpdateDepartamento(id uuid.UUID, departamento *entities.Depart
 			return err
 		}
 		if hasCycle {
-			return errors.New("não é possível criar ciclo na hierarquia de departamentos")
+			return app.Errorf(app.ECONFLICT, "não é possível criar ciclo na hierarquia de departamentos")
 		}
 	}
 
@@ -145,7 +145,7 @@ func (u *usecase) UpdateDepartamento(id uuid.UUID, departamento *entities.Depart
 
 func (u *usecase) DeleteDepartamento(id uuid.UUID) error {
 	if id == uuid.Nil {
-		return errors.New("ID de departamento inválido")
+		return app.Errorf(app.EINVALID, "ID de departamento inválido")
 	}
 
 	_, err := u.departamentoRepo.FindByID(id)
@@ -168,7 +168,7 @@ func (u *usecase) ListDepartamentos(filters map[string]interface{}, limit, offse
 
 func (u *usecase) GetGerenteColaboradores(gerenteID uuid.UUID) ([]entities.Colaborador, error) {
 	if gerenteID == uuid.Nil {
-		return nil, errors.New("ID de gerente inválido")
+		return nil, app.Errorf(app.EINVALID, "ID de gerente inválido")
 	}
 
 	gerente, err := u.colaboradorRepo.FindByID(gerenteID)
@@ -176,7 +176,7 @@ func (u *usecase) GetGerenteColaboradores(gerenteID uuid.UUID) ([]entities.Colab
 		return nil, err
 	}
 	if gerente == nil {
-		return nil, errors.New("gerente não encontrado")
+		return nil, app.Errorf(app.ENOTFOUND, "gerente não encontrado")
 	}
 
 	departmentIDs, err := u.departamentoRepo.FindAllSubDepartmentIDs(gerente.DepartamentoID)
@@ -189,24 +189,24 @@ func (u *usecase) GetGerenteColaboradores(gerenteID uuid.UUID) ([]entities.Colab
 
 func (u *usecase) validateDepartamento(departamento *entities.Departamento) error {
 	if departamento == nil {
-		return errors.New("departamento não pode ser nulo")
+		return app.Errorf(app.EINVALID, "departamento não pode ser nulo")
 	}
 
 	departamento.Nome = strings.TrimSpace(departamento.Nome)
 	if departamento.Nome == "" {
-		return errors.New("nome é obrigatório")
+		return app.Errorf(app.EINVALID, "nome é obrigatório")
 	}
 
 	if len(departamento.Nome) < 3 {
-		return errors.New("nome deve ter pelo menos 3 caracteres")
+		return app.Errorf(app.EINVALID, "nome deve ter pelo menos 3 caracteres")
 	}
 
 	if len(departamento.Nome) > 255 {
-		return errors.New("nome não pode exceder 255 caracteres")
+		return app.Errorf(app.EINVALID, "nome não pode exceder 255 caracteres")
 	}
 
 	if departamento.GerenteID == uuid.Nil {
-		return errors.New("ID do gerente é obrigatório")
+		return app.Errorf(app.EINVALID, "ID do gerente é obrigatório")
 	}
 
 	return nil

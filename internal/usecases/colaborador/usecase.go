@@ -1,11 +1,10 @@
 package colaborador
 
 import (
-	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/google/uuid"
+	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/repository"
 	"github.com/lkgiovani/growth_technical_challenge/pkg/utils"
@@ -35,7 +34,7 @@ func (u *usecase) GetAllColaboradores(limit, offset int) ([]entities.Colaborador
 
 func (u *usecase) GetColaboradorByID(id uuid.UUID) (*entities.Colaborador, error) {
 	if id == uuid.Nil {
-		return nil, errors.New("ID de colaborador inválido")
+		return nil, app.Errorf(app.EINVALID, "ID de colaborador inválido")
 	}
 	return u.colaboradorRepo.FindByID(id)
 }
@@ -47,7 +46,7 @@ func (u *usecase) CreateColaborador(colaborador *entities.Colaborador) error {
 
 	colaborador.CPF = utils.NormalizeCPF(colaborador.CPF)
 	if !utils.ValidateCPF(colaborador.CPF) {
-		return errors.New("CPF inválido")
+		return app.Errorf(app.EINVALID, "CPF inválido")
 	}
 
 	existingColaborador, err := u.colaboradorRepo.FindByCPF(colaborador.CPF)
@@ -55,7 +54,7 @@ func (u *usecase) CreateColaborador(colaborador *entities.Colaborador) error {
 		return err
 	}
 	if existingColaborador != nil {
-		return errors.New("CPF já existe")
+		return app.Errorf(app.EDUPLICATION, "CPF já existe")
 	}
 
 	if colaborador.RG != nil && *colaborador.RG != "" {
@@ -67,16 +66,16 @@ func (u *usecase) CreateColaborador(colaborador *entities.Colaborador) error {
 			return errRG
 		}
 		if existingRG != nil {
-			return errors.New("RG já existe")
+			return app.Errorf(app.EDUPLICATION, "RG já existe")
 		}
 	}
 
 	departamento, errDept := u.departamentoRepo.FindByID(colaborador.DepartamentoID)
 	if errDept != nil {
-		return fmt.Errorf("departamento não encontrado: %w", errDept)
+		return errDept
 	}
 	if departamento == nil {
-		return errors.New("departamento não existe")
+		return app.Errorf(app.ENOTFOUND, "departamento não encontrado")
 	}
 
 	colaborador.Nome = strings.TrimSpace(colaborador.Nome)
@@ -86,7 +85,7 @@ func (u *usecase) CreateColaborador(colaborador *entities.Colaborador) error {
 
 func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colaborador) error {
 	if id == uuid.Nil {
-		return errors.New("ID de colaborador inválido")
+		return app.Errorf(app.EINVALID, "ID de colaborador inválido")
 	}
 
 	existingColaborador, err := u.colaboradorRepo.FindByID(id)
@@ -100,7 +99,7 @@ func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colabora
 
 	colaborador.CPF = utils.NormalizeCPF(colaborador.CPF)
 	if !utils.ValidateCPF(colaborador.CPF) {
-		return errors.New("CPF inválido")
+		return app.Errorf(app.EINVALID, "CPF inválido")
 	}
 
 	cpfColaborador, err := u.colaboradorRepo.FindByCPF(colaborador.CPF)
@@ -108,7 +107,7 @@ func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colabora
 		return err
 	}
 	if cpfColaborador != nil && cpfColaborador.ID != id {
-		return errors.New("CPF já existe")
+		return app.Errorf(app.EDUPLICATION, "CPF já existe")
 	}
 
 	if colaborador.RG != nil && *colaborador.RG != "" {
@@ -120,16 +119,16 @@ func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colabora
 			return errRG
 		}
 		if rgColaborador != nil && rgColaborador.ID != id {
-			return errors.New("RG já existe")
+			return app.Errorf(app.EDUPLICATION, "RG já existe")
 		}
 	}
 
 	departamento, errDept := u.departamentoRepo.FindByID(colaborador.DepartamentoID)
 	if errDept != nil {
-		return fmt.Errorf("departamento não encontrado: %w", errDept)
+		return errDept
 	}
 	if departamento == nil {
-		return errors.New("departamento não existe")
+		return app.Errorf(app.ENOTFOUND, "departamento não encontrado")
 	}
 
 	existingColaborador.Nome = strings.TrimSpace(colaborador.Nome)
@@ -142,7 +141,7 @@ func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colabora
 
 func (u *usecase) DeleteColaborador(id uuid.UUID) error {
 	if id == uuid.Nil {
-		return errors.New("ID de colaborador inválido")
+		return app.Errorf(app.EINVALID, "ID de colaborador inválido")
 	}
 
 	_, err := u.colaboradorRepo.FindByID(id)
@@ -165,29 +164,29 @@ func (u *usecase) ListColaboradores(filters map[string]interface{}, limit, offse
 
 func (u *usecase) validateColaborador(colaborador *entities.Colaborador) error {
 	if colaborador == nil {
-		return errors.New("colaborador não pode ser nulo")
+		return app.Errorf(app.EINVALID, "colaborador não pode ser nulo")
 	}
 
 	colaborador.Nome = strings.TrimSpace(colaborador.Nome)
 	if colaborador.Nome == "" {
-		return errors.New("nome é obrigatório")
+		return app.Errorf(app.EINVALID, "nome é obrigatório")
 	}
 
 	if len(colaborador.Nome) < 3 {
-		return errors.New("nome deve ter pelo menos 3 caracteres")
+		return app.Errorf(app.EINVALID, "nome deve ter pelo menos 3 caracteres")
 	}
 
 	if len(colaborador.Nome) > 255 {
-		return errors.New("nome não pode exceder 255 caracteres")
+		return app.Errorf(app.EINVALID, "nome não pode exceder 255 caracteres")
 	}
 
 	colaborador.CPF = strings.TrimSpace(colaborador.CPF)
 	if colaborador.CPF == "" {
-		return errors.New("CPF é obrigatório")
+		return app.Errorf(app.EINVALID, "CPF é obrigatório")
 	}
 
 	if colaborador.DepartamentoID == uuid.Nil {
-		return errors.New("ID do departamento é obrigatório")
+		return app.Errorf(app.EINVALID, "ID do departamento é obrigatório")
 	}
 
 	return nil
