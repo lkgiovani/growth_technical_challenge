@@ -11,9 +11,9 @@ import (
 	"github.com/lkgiovani/growth_technical_challenge/infra/database"
 	httpDelivery "github.com/lkgiovani/growth_technical_challenge/internal/delivery/http"
 	"github.com/lkgiovani/growth_technical_challenge/internal/delivery/http/router"
+	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/colaborador"
+	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/departamento"
 
-	"github.com/lkgiovani/growth_technical_challenge/internal/domain/usecases/colaborador"
-	"github.com/lkgiovani/growth_technical_challenge/internal/domain/usecases/departamento"
 	"github.com/lkgiovani/growth_technical_challenge/internal/repository"
 	pkgCache "github.com/lkgiovani/growth_technical_challenge/pkg/cache"
 	"go.uber.org/fx"

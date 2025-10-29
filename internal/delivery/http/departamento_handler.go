@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
-	"github.com/lkgiovani/growth_technical_challenge/internal/domain/usecases/departamento"
+	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/departamento"
 )
 
 type DepartamentoHandler struct {
@@ -183,4 +183,3 @@ func (h *DepartamentoHandler) ListDepartamentos(c *gin.Context) {
 		TotalPages: totalPages,
 	})
 }
-

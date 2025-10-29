@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
-	"github.com/lkgiovani/growth_technical_challenge/internal/domain/usecases/colaborador"
+	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/colaborador"
 )
 
 type ColaboradorHandler struct {
@@ -197,4 +197,3 @@ func (h *ColaboradorHandler) ListColaboradores(c *gin.Context) {
 		TotalPages: totalPages,
 	})
 }
-
