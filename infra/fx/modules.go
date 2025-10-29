@@ -26,22 +26,8 @@ var Module = fx.Options(
 		NewDatabase,
 		NewRedisClient,
 		NewRouter,
-		fx.Annotate(
-			NewBaseColaboradorRepository,
-			fx.ResultTags(`name:"baseColaboradorRepo"`),
-		),
-		fx.Annotate(
-			NewCachedColaboradorRepository,
-			fx.ParamTags(`name:"baseColaboradorRepo"`),
-		),
-		fx.Annotate(
-			NewBaseDepartamentoRepository,
-			fx.ResultTags(`name:"baseDepartamentoRepo"`),
-		),
-		fx.Annotate(
-			NewCachedDepartamentoRepository,
-			fx.ParamTags(`name:"baseDepartamentoRepo"`),
-		),
+		NewColaboradorRepository,
+		NewDepartamentoRepository,
 		NewColaboradorUseCase,
 		NewDepartamentoUseCase,
 		httpDelivery.NewColaboradorHandler,
@@ -103,34 +89,18 @@ func NewRouter(cfg *config.Config) *gin.Engine {
 	return gin.Default()
 }
 
-func NewBaseColaboradorRepository(db *gorm.DB) repository.ColaboradorRepository {
-	return repository.NewColaboradorRepository(db)
-}
-
-func NewCachedColaboradorRepository(
-	baseRepo repository.ColaboradorRepository,
-	cache pkgCache.Cache,
-) repository.ColaboradorRepository {
+func NewColaboradorRepository(db *gorm.DB, cache pkgCache.Cache) repository.ColaboradorRepository {
 	if cache == nil {
-		log.Println("Cache não disponível para Colaborador, usando repositório base sem cache")
-		return baseRepo
+		log.Println("Cache não disponível para Colaborador, usando repositório sem cache")
 	}
-	return repository.NewCachedColaboradorRepository(baseRepo, cache)
+	return repository.NewColaboradorRepository(db, cache)
 }
 
-func NewBaseDepartamentoRepository(db *gorm.DB) repository.DepartamentoRepository {
-	return repository.NewDepartamentoRepository(db)
-}
-
-func NewCachedDepartamentoRepository(
-	baseRepo repository.DepartamentoRepository,
-	cache pkgCache.Cache,
-) repository.DepartamentoRepository {
+func NewDepartamentoRepository(db *gorm.DB, cache pkgCache.Cache) repository.DepartamentoRepository {
 	if cache == nil {
-		log.Println("Cache não disponível para Departamento, usando repositório base sem cache")
-		return baseRepo
+		log.Println("Cache não disponível para Departamento, usando repositório sem cache")
 	}
-	return repository.NewCachedDepartamentoRepository(baseRepo, cache)
+	return repository.NewDepartamentoRepository(db, cache)
 }
 
 func NewColaboradorUseCase(

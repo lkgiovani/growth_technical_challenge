@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/colaborador"
 )
@@ -70,14 +71,17 @@ func (h *ColaboradorHandler) CreateColaborador(c *gin.Context) {
 
 	if err := h.colaboradorUseCase.CreateColaborador(&colaborador); err != nil {
 		statusCode := http.StatusUnprocessableEntity
-		if err.Error() == "CPF já existe" || err.Error() == "RG já existe" {
+		switch app.ErrorCode(err) {
+		case app.EDUPLICATION:
 			statusCode = http.StatusConflict
-		} else if err.Error() == "departamento não encontrado" {
+		case app.ENOTFOUND:
 			statusCode = http.StatusNotFound
+		case app.EINVALID:
+			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
 			Error:   "Falha ao criar colaborador",
-			Message: err.Error(),
+			Message: app.ErrorMessage(err),
 		})
 		return
 	}
@@ -109,14 +113,17 @@ func (h *ColaboradorHandler) UpdateColaborador(c *gin.Context) {
 
 	if err := h.colaboradorUseCase.UpdateColaborador(id, &colaborador); err != nil {
 		statusCode := http.StatusUnprocessableEntity
-		if err.Error() == "colaborador não encontrado" {
+		switch app.ErrorCode(err) {
+		case app.ENOTFOUND:
 			statusCode = http.StatusNotFound
-		} else if err.Error() == "CPF já existe" || err.Error() == "RG já existe" {
+		case app.EDUPLICATION:
 			statusCode = http.StatusConflict
+		case app.EINVALID:
+			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
 			Error:   "Falha ao atualizar colaborador",
-			Message: err.Error(),
+			Message: app.ErrorMessage(err),
 		})
 		return
 	}
@@ -141,12 +148,15 @@ func (h *ColaboradorHandler) DeleteColaborador(c *gin.Context) {
 
 	if err := h.colaboradorUseCase.DeleteColaborador(id); err != nil {
 		statusCode := http.StatusInternalServerError
-		if err.Error() == "colaborador não encontrado" {
+		switch app.ErrorCode(err) {
+		case app.ENOTFOUND:
 			statusCode = http.StatusNotFound
+		case app.EINVALID:
+			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
 			Error:   "Falha ao remover colaborador",
-			Message: err.Error(),
+			Message: app.ErrorMessage(err),
 		})
 		return
 	}

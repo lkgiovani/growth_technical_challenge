@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/departamento"
 )
@@ -56,14 +57,17 @@ func (h *DepartamentoHandler) CreateDepartamento(c *gin.Context) {
 
 	if err := h.departamentoUseCase.CreateDepartamento(&departamento); err != nil {
 		statusCode := http.StatusUnprocessableEntity
-		if err.Error() == "gerente não encontrado" || err.Error() == "departamento superior não encontrado" {
+		switch app.ErrorCode(err) {
+		case app.ENOTFOUND:
 			statusCode = http.StatusNotFound
-		} else if err.Error() == "não é possível criar ciclo na hierarquia de departamentos" {
+		case app.ECONFLICT:
 			statusCode = http.StatusConflict
+		case app.EINVALID:
+			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
 			Error:   "Falha ao criar departamento",
-			Message: err.Error(),
+			Message: app.ErrorMessage(err),
 		})
 		return
 	}
@@ -95,14 +99,17 @@ func (h *DepartamentoHandler) UpdateDepartamento(c *gin.Context) {
 
 	if err := h.departamentoUseCase.UpdateDepartamento(id, &departamento); err != nil {
 		statusCode := http.StatusUnprocessableEntity
-		if err.Error() == "departamento não encontrado" || err.Error() == "gerente não encontrado" || err.Error() == "departamento superior não encontrado" {
+		switch app.ErrorCode(err) {
+		case app.ENOTFOUND:
 			statusCode = http.StatusNotFound
-		} else if err.Error() == "não é possível criar ciclo na hierarquia de departamentos" {
+		case app.ECONFLICT:
 			statusCode = http.StatusConflict
+		case app.EINVALID:
+			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
 			Error:   "Falha ao atualizar departamento",
-			Message: err.Error(),
+			Message: app.ErrorMessage(err),
 		})
 		return
 	}
@@ -127,12 +134,15 @@ func (h *DepartamentoHandler) DeleteDepartamento(c *gin.Context) {
 
 	if err := h.departamentoUseCase.DeleteDepartamento(id); err != nil {
 		statusCode := http.StatusInternalServerError
-		if err.Error() == "departamento não encontrado" {
+		switch app.ErrorCode(err) {
+		case app.ENOTFOUND:
 			statusCode = http.StatusNotFound
+		case app.EINVALID:
+			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
 			Error:   "Falha ao remover departamento",
-			Message: err.Error(),
+			Message: app.ErrorMessage(err),
 		})
 		return
 	}
