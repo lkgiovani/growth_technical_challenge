@@ -1,0 +1,5 @@
+node_modules/
+schema/openapi.yaml
+*.log
+.DS_Store
+
