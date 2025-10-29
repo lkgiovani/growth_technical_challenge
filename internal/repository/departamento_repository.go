@@ -1,0 +1,257 @@
+package repository
+
+import (
+	"errors"
+
+	"github.com/google/uuid"
+	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
+	"gorm.io/gorm"
+)
+
+type DepartamentoRepository interface {
+	FindAll(limit, offset int) ([]entities.Departamento, int64, error)
+	FindByID(id uuid.UUID) (*entities.Departamento, error)
+	FindByIDWithHierarchy(id uuid.UUID) (*entities.Departamento, error)
+	FindByFilters(filters map[string]interface{}, limit, offset int) ([]entities.Departamento, int64, error)
+	FindSubDepartments(parentID uuid.UUID) ([]entities.Departamento, error)
+	FindAllSubDepartmentIDs(parentID uuid.UUID) ([]uuid.UUID, error)
+	HasCycle(departmentID, parentID uuid.UUID) (bool, error)
+	Create(departamento *entities.Departamento) error
+	Update(departamento *entities.Departamento) error
+	Delete(id uuid.UUID) error
+	Count() (int64, error)
+}
+
+type departamentoRepository struct {
+	db *gorm.DB
+}
+
+func NewDepartamentoRepository(db *gorm.DB) DepartamentoRepository {
+	return &departamentoRepository{db: db}
+}
+
+func (r *departamentoRepository) FindAll(limit, offset int) ([]entities.Departamento, int64, error) {
+	var departamentos []entities.Departamento
+	var total int64
+
+	if err := r.db.Model(&entities.Departamento{}).Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	result := r.db.Preload("Gerente").Preload("DepartamentoSuperior").
+		Limit(limit).Offset(offset).Find(&departamentos)
+	return departamentos, total, result.Error
+}
+
+func (r *departamentoRepository) FindByID(id uuid.UUID) (*entities.Departamento, error) {
+	var departamento entities.Departamento
+	result := r.db.Preload("Gerente").Preload("DepartamentoSuperior").
+		First(&departamento, "id = ?", id)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, errors.New("departamento não encontrado")
+		}
+		return nil, result.Error
+	}
+	return &departamento, nil
+}
+
+func (r *departamentoRepository) FindByIDWithHierarchy(id uuid.UUID) (*entities.Departamento, error) {
+	type DeptHierarchy struct {
+		ID                     uuid.UUID  `json:"id"`
+		Nome                   string     `json:"nome"`
+		GerenteID              uuid.UUID  `json:"gerente_id"`
+		GerenteNome            string     `json:"gerente_nome"`
+		DepartamentoSuperiorID *uuid.UUID `json:"departamento_superior_id"`
+		Level                  int        `json:"level"`
+	}
+
+	query := `
+		WITH RECURSIVE department_tree AS (
+			SELECT 
+				d.id,
+				d.nome,
+				d.gerente_id,
+				c.nome as gerente_nome,
+				d.departamento_superior_id,
+				0 as level
+			FROM departamentos d
+			LEFT JOIN colaboradores c ON d.gerente_id = c.id
+			WHERE d.id = ? AND d.deleted_at IS NULL
+			
+			UNION ALL
+			
+			SELECT 
+				d.id,
+				d.nome,
+				d.gerente_id,
+				c.nome as gerente_nome,
+				d.departamento_superior_id,
+				dt.level + 1
+			FROM departamentos d
+			LEFT JOIN colaboradores c ON d.gerente_id = c.id
+			INNER JOIN department_tree dt ON d.departamento_superior_id = dt.id
+			WHERE d.deleted_at IS NULL
+		)
+		SELECT * FROM department_tree ORDER BY level, nome
+	`
+
+	var hierarchy []DeptHierarchy
+	if err := r.db.Raw(query, id).Scan(&hierarchy).Error; err != nil {
+		return nil, err
+	}
+
+	if len(hierarchy) == 0 {
+		return nil, errors.New("departamento não encontrado")
+	}
+
+	deptMap := make(map[uuid.UUID]*entities.Departamento)
+	var rootDept *entities.Departamento
+
+	for _, h := range hierarchy {
+		dept := &entities.Departamento{
+			ID:                     h.ID,
+			Nome:                   h.Nome,
+			GerenteID:              h.GerenteID,
+			DepartamentoSuperiorID: h.DepartamentoSuperiorID,
+			Gerente: &entities.Colaborador{
+				ID:   h.GerenteID,
+				Nome: h.GerenteNome,
+			},
+			Subdepartamentos: []entities.Departamento{},
+		}
+		deptMap[h.ID] = dept
+
+		if h.Level == 0 {
+			rootDept = dept
+		}
+	}
+
+	for _, h := range hierarchy {
+		if h.DepartamentoSuperiorID != nil {
+			if parent, ok := deptMap[*h.DepartamentoSuperiorID]; ok {
+				parent.Subdepartamentos = append(parent.Subdepartamentos, *deptMap[h.ID])
+			}
+		}
+	}
+
+	return rootDept, nil
+}
+
+func (r *departamentoRepository) FindByFilters(filters map[string]interface{}, limit, offset int) ([]entities.Departamento, int64, error) {
+	var departamentos []entities.Departamento
+	var total int64
+
+	query := r.db.Model(&entities.Departamento{})
+
+	if nome, ok := filters["nome"].(string); ok && nome != "" {
+		query = query.Where("nome ILIKE ?", "%"+nome+"%")
+	}
+	if gerenteNome, ok := filters["gerente_nome"].(string); ok && gerenteNome != "" {
+		query = query.Joins("JOIN colaboradores ON colaboradores.id = departamentos.gerente_id").
+			Where("colaboradores.nome ILIKE ?", "%"+gerenteNome+"%")
+	}
+	if parentID, ok := filters["departamento_superior_id"].(string); ok && parentID != "" {
+		if id, err := uuid.Parse(parentID); err == nil {
+			query = query.Where("departamento_superior_id = ?", id)
+		}
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	result := query.Preload("Gerente").Preload("DepartamentoSuperior").
+		Limit(limit).Offset(offset).Find(&departamentos)
+	return departamentos, total, result.Error
+}
+
+func (r *departamentoRepository) FindSubDepartments(parentID uuid.UUID) ([]entities.Departamento, error) {
+	var departamentos []entities.Departamento
+	result := r.db.Where("departamento_superior_id = ?", parentID).Find(&departamentos)
+	return departamentos, result.Error
+}
+
+func (r *departamentoRepository) FindAllSubDepartmentIDs(parentID uuid.UUID) ([]uuid.UUID, error) {
+	query := `
+		WITH RECURSIVE subdepartments AS (
+			SELECT id FROM departamentos 
+			WHERE id = ? AND deleted_at IS NULL
+			
+			UNION ALL
+			
+			SELECT d.id 
+			FROM departamentos d
+			INNER JOIN subdepartments sd ON d.departamento_superior_id = sd.id
+			WHERE d.deleted_at IS NULL
+		)
+		SELECT id FROM subdepartments
+	`
+
+	var ids []uuid.UUID
+	if err := r.db.Raw(query, parentID).Scan(&ids).Error; err != nil {
+		return nil, err
+	}
+
+	return ids, nil
+}
+
+func (r *departamentoRepository) HasCycle(departmentID, parentID uuid.UUID) (bool, error) {
+	if departmentID == parentID {
+		return true, nil
+	}
+
+	visited := make(map[uuid.UUID]bool)
+	current := parentID
+
+	for current != uuid.Nil {
+		if current == departmentID {
+			return true, nil
+		}
+
+		if visited[current] {
+			return true, nil
+		}
+		visited[current] = true
+
+		var dept entities.Departamento
+		if err := r.db.First(&dept, "id = ?", current).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return false, nil
+			}
+			return false, err
+		}
+
+		if dept.DepartamentoSuperiorID == nil {
+			break
+		}
+		current = *dept.DepartamentoSuperiorID
+	}
+
+	return false, nil
+}
+
+func (r *departamentoRepository) Create(departamento *entities.Departamento) error {
+	return r.db.Create(departamento).Error
+}
+
+func (r *departamentoRepository) Update(departamento *entities.Departamento) error {
+	return r.db.Save(departamento).Error
+}
+
+func (r *departamentoRepository) Delete(id uuid.UUID) error {
+	result := r.db.Delete(&entities.Departamento{}, "id = ?", id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("departamento não encontrado")
+	}
+	return nil
+}
+
+func (r *departamentoRepository) Count() (int64, error) {
+	var count int64
+	result := r.db.Model(&entities.Departamento{}).Count(&count)
+	return count, result.Error
+}
