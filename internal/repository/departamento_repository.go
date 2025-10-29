@@ -1,10 +1,15 @@
 package repository
 
 import (
+	"context"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
+	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
+	"github.com/lkgiovani/growth_technical_challenge/pkg/cache"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -23,11 +28,15 @@ type DepartamentoRepository interface {
 }
 
 type departamentoRepository struct {
-	db *gorm.DB
+	db    *gorm.DB
+	cache cache.Cache
 }
 
-func NewDepartamentoRepository(db *gorm.DB) DepartamentoRepository {
-	return &departamentoRepository{db: db}
+func NewDepartamentoRepository(db *gorm.DB, cacheClient cache.Cache) DepartamentoRepository {
+	return &departamentoRepository{
+		db:    db,
+		cache: cacheClient,
+	}
 }
 
 func (r *departamentoRepository) FindAll(limit, offset int) ([]entities.Departamento, int64, error) {
@@ -49,7 +58,7 @@ func (r *departamentoRepository) FindByID(id uuid.UUID) (*entities.Departamento,
 		First(&departamento, "id = ?", id)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, errors.New("departamento não encontrado")
+			return nil, app.Errorf(app.ENOTFOUND, "departamento não encontrado")
 		}
 		return nil, result.Error
 	}
@@ -57,6 +66,21 @@ func (r *departamentoRepository) FindByID(id uuid.UUID) (*entities.Departamento,
 }
 
 func (r *departamentoRepository) FindByIDWithHierarchy(id uuid.UUID) (*entities.Departamento, error) {
+	if r.cache != nil {
+		ctx := context.Background()
+		cacheKey := fmt.Sprintf("departamento:hierarquia:%s", id.String())
+
+		var departamento entities.Departamento
+		err := cache.GetJSON(ctx, r.cache, cacheKey, &departamento)
+		if err == nil {
+			return &departamento, nil
+		}
+
+		if err != redis.Nil {
+			fmt.Printf("Erro no cache: %v\n", err)
+		}
+	}
+
 	type DeptHierarchy struct {
 		ID                     uuid.UUID  `json:"id"`
 		Nome                   string     `json:"nome"`
@@ -102,7 +126,7 @@ func (r *departamentoRepository) FindByIDWithHierarchy(id uuid.UUID) (*entities.
 	}
 
 	if len(hierarchy) == 0 {
-		return nil, errors.New("departamento não encontrado")
+		return nil, app.Errorf(app.ENOTFOUND, "departamento não encontrado")
 	}
 
 	deptMap := make(map[uuid.UUID]*entities.Departamento)
@@ -132,6 +156,14 @@ func (r *departamentoRepository) FindByIDWithHierarchy(id uuid.UUID) (*entities.
 			if parent, ok := deptMap[*h.DepartamentoSuperiorID]; ok {
 				parent.Subdepartamentos = append(parent.Subdepartamentos, *deptMap[h.ID])
 			}
+		}
+	}
+
+	if r.cache != nil && rootDept != nil {
+		ctx := context.Background()
+		cacheKey := fmt.Sprintf("departamento:hierarquia:%s", id.String())
+		if err := cache.SetJSON(ctx, r.cache, cacheKey, rootDept); err != nil {
+			fmt.Printf("Falha ao cachear hierarquia do departamento: %v\n", err)
 		}
 	}
 
@@ -173,6 +205,21 @@ func (r *departamentoRepository) FindSubDepartments(parentID uuid.UUID) ([]entit
 }
 
 func (r *departamentoRepository) FindAllSubDepartmentIDs(parentID uuid.UUID) ([]uuid.UUID, error) {
+	if r.cache != nil {
+		ctx := context.Background()
+		cacheKey := fmt.Sprintf("departamento:subdept_ids:%s", parentID.String())
+
+		var ids []uuid.UUID
+		err := cache.GetJSON(ctx, r.cache, cacheKey, &ids)
+		if err == nil {
+			return ids, nil
+		}
+
+		if err != redis.Nil {
+			fmt.Printf("Erro no cache: %v\n", err)
+		}
+	}
+
 	query := `
 		WITH RECURSIVE subdepartments AS (
 			SELECT id FROM departamentos 
@@ -191,6 +238,14 @@ func (r *departamentoRepository) FindAllSubDepartmentIDs(parentID uuid.UUID) ([]
 	var ids []uuid.UUID
 	if err := r.db.Raw(query, parentID).Scan(&ids).Error; err != nil {
 		return nil, err
+	}
+
+	if r.cache != nil {
+		ctx := context.Background()
+		cacheKey := fmt.Sprintf("departamento:subdept_ids:%s", parentID.String())
+		if err := cache.SetJSON(ctx, r.cache, cacheKey, ids); err != nil {
+			fmt.Printf("Falha ao cachear IDs dos subdepartamentos: %v\n", err)
+		}
 	}
 
 	return ids, nil
@@ -232,21 +287,94 @@ func (r *departamentoRepository) HasCycle(departmentID, parentID uuid.UUID) (boo
 }
 
 func (r *departamentoRepository) Create(departamento *entities.Departamento) error {
-	return r.db.Create(departamento).Error
+	err := r.db.Create(departamento).Error
+	if err != nil {
+		return err
+	}
+
+	if r.cache != nil {
+		ctx := context.Background()
+		patterns := []string{
+			fmt.Sprintf("departamento:hierarquia:%s", departamento.ID.String()),
+			fmt.Sprintf("departamento:subdept_ids:%s", departamento.ID.String()),
+		}
+		if departamento.DepartamentoSuperiorID != nil {
+			patterns = append(patterns,
+				fmt.Sprintf("departamento:hierarquia:%s", departamento.DepartamentoSuperiorID.String()),
+				fmt.Sprintf("departamento:subdept_ids:%s", departamento.DepartamentoSuperiorID.String()),
+			)
+		}
+		for _, pattern := range patterns {
+			if err := r.cache.Del(ctx, pattern); err != nil {
+				fmt.Printf("Falha ao invalidar cache para %s: %v\n", pattern, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (r *departamentoRepository) Update(departamento *entities.Departamento) error {
-	return r.db.Save(departamento).Error
+	err := r.db.Save(departamento).Error
+	if err != nil {
+		return err
+	}
+
+	if r.cache != nil {
+		ctx := context.Background()
+		patterns := []string{
+			fmt.Sprintf("departamento:hierarquia:%s", departamento.ID.String()),
+			fmt.Sprintf("departamento:subdept_ids:%s", departamento.ID.String()),
+		}
+		if departamento.DepartamentoSuperiorID != nil {
+			patterns = append(patterns,
+				fmt.Sprintf("departamento:hierarquia:%s", departamento.DepartamentoSuperiorID.String()),
+				fmt.Sprintf("departamento:subdept_ids:%s", departamento.DepartamentoSuperiorID.String()),
+			)
+		}
+		for _, pattern := range patterns {
+			if err := r.cache.Del(ctx, pattern); err != nil {
+				fmt.Printf("Falha ao invalidar cache para %s: %v\n", pattern, err)
+			}
+		}
+	}
+
+	return nil
 }
 
 func (r *departamentoRepository) Delete(id uuid.UUID) error {
+	dept, err := r.FindByID(id)
+	if err != nil {
+		return err
+	}
+
 	result := r.db.Delete(&entities.Departamento{}, "id = ?", id)
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return errors.New("departamento não encontrado")
+		return app.Errorf(app.ENOTFOUND, "departamento não encontrado")
 	}
+
+	if r.cache != nil {
+		ctx := context.Background()
+		patterns := []string{
+			fmt.Sprintf("departamento:hierarquia:%s", id.String()),
+			fmt.Sprintf("departamento:subdept_ids:%s", id.String()),
+		}
+		if dept.DepartamentoSuperiorID != nil {
+			patterns = append(patterns,
+				fmt.Sprintf("departamento:hierarquia:%s", dept.DepartamentoSuperiorID.String()),
+				fmt.Sprintf("departamento:subdept_ids:%s", dept.DepartamentoSuperiorID.String()),
+			)
+		}
+		for _, pattern := range patterns {
+			if err := r.cache.Del(ctx, pattern); err != nil {
+				fmt.Printf("Falha ao invalidar cache para %s: %v\n", pattern, err)
+			}
+		}
+	}
+
 	return nil
 }
 
