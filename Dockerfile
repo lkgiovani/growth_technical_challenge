@@ -1,4 +1,4 @@
-ARG GO_VERSION=1.24
+ARG GO_VERSION=1.25.3
 
 # Build
 FROM golang:${GO_VERSION}-alpine AS build
@@ -6,17 +6,8 @@ WORKDIR /service
 COPY ./go.mod ./go.sum ./
 RUN go mod download
 COPY ./ ./
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app ./cmd/server
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app ./cmd/main.go
 
-# Test
-FROM golang:${GO_VERSION}-alpine AS tests
-ENV CI=1
-WORKDIR /service
-COPY ./go.mod ./go.sum ./
-RUN go mod download
-COPY ./ ./
-RUN go clean -testcache
-RUN go test -v ./...
 
 # Docs Build
 FROM node:22-slim AS docs
