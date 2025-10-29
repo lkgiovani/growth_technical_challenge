@@ -1,0 +1,185 @@
+package fx
+
+import (
+	"context"
+	"fmt"
+	"log"
+
+	"github.com/gin-gonic/gin"
+	"github.com/lkgiovani/growth_technical_challenge/infra/cache"
+	"github.com/lkgiovani/growth_technical_challenge/infra/config"
+	"github.com/lkgiovani/growth_technical_challenge/infra/database"
+	httpDelivery "github.com/lkgiovani/growth_technical_challenge/internal/delivery/http"
+	"github.com/lkgiovani/growth_technical_challenge/internal/delivery/http/router"
+
+	"github.com/lkgiovani/growth_technical_challenge/internal/domain/usecases/colaborador"
+	"github.com/lkgiovani/growth_technical_challenge/internal/domain/usecases/departamento"
+	"github.com/lkgiovani/growth_technical_challenge/internal/repository"
+	pkgCache "github.com/lkgiovani/growth_technical_challenge/pkg/cache"
+	"go.uber.org/fx"
+	"gorm.io/gorm"
+)
+
+var Module = fx.Options(
+	fx.Provide(
+		config.NewConfig,
+		NewDatabase,
+		NewRedisClient,
+		NewRouter,
+		fx.Annotate(
+			NewBaseColaboradorRepository,
+			fx.ResultTags(`name:"baseColaboradorRepo"`),
+		),
+		fx.Annotate(
+			NewCachedColaboradorRepository,
+			fx.ParamTags(`name:"baseColaboradorRepo"`),
+		),
+		fx.Annotate(
+			NewBaseDepartamentoRepository,
+			fx.ResultTags(`name:"baseDepartamentoRepo"`),
+		),
+		fx.Annotate(
+			NewCachedDepartamentoRepository,
+			fx.ParamTags(`name:"baseDepartamentoRepo"`),
+		),
+		NewColaboradorUseCase,
+		NewDepartamentoUseCase,
+		httpDelivery.NewColaboradorHandler,
+		httpDelivery.NewDepartamentoHandler,
+		httpDelivery.NewGerenteHandler,
+		httpDelivery.NewDocsHandler,
+	),
+	fx.Invoke(RegisterLifecycle),
+)
+
+func NewDatabase(lc fx.Lifecycle, cfg *config.Config) (*gorm.DB, error) {
+	if err := database.Connect(); err != nil {
+		return nil, err
+	}
+
+	db := database.GetDB()
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			log.Println("Banco de dados conectado com sucesso")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			sqlDB, err := db.DB()
+			if err != nil {
+				return err
+			}
+			log.Println("Fechando conexão com o banco de dados...")
+			return sqlDB.Close()
+		},
+	})
+
+	return db, nil
+}
+
+func NewRedisClient(lc fx.Lifecycle, cfg *config.Config) (pkgCache.Cache, error) {
+	redisClient, err := cache.NewRedisClient(cfg)
+	if err != nil {
+		log.Printf("Aviso: Falha ao conectar ao Redis: %v. Continuando sem cache.", err)
+		return nil, err
+	}
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			log.Println("Redis conectado com sucesso")
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			log.Println("Fechando conexão com Redis...")
+			return redisClient.Close()
+		},
+	})
+
+	return redisClient, nil
+}
+
+func NewRouter(cfg *config.Config) *gin.Engine {
+	gin.SetMode(cfg.Server.Mode)
+	return gin.Default()
+}
+
+func NewBaseColaboradorRepository(db *gorm.DB) repository.ColaboradorRepository {
+	return repository.NewColaboradorRepository(db)
+}
+
+func NewCachedColaboradorRepository(
+	baseRepo repository.ColaboradorRepository,
+	cache pkgCache.Cache,
+) repository.ColaboradorRepository {
+	if cache == nil {
+		log.Println("Cache não disponível para Colaborador, usando repositório base sem cache")
+		return baseRepo
+	}
+	return repository.NewCachedColaboradorRepository(baseRepo, cache)
+}
+
+func NewBaseDepartamentoRepository(db *gorm.DB) repository.DepartamentoRepository {
+	return repository.NewDepartamentoRepository(db)
+}
+
+func NewCachedDepartamentoRepository(
+	baseRepo repository.DepartamentoRepository,
+	cache pkgCache.Cache,
+) repository.DepartamentoRepository {
+	if cache == nil {
+		log.Println("Cache não disponível para Departamento, usando repositório base sem cache")
+		return baseRepo
+	}
+	return repository.NewCachedDepartamentoRepository(baseRepo, cache)
+}
+
+func NewColaboradorUseCase(
+	colaboradorRepo repository.ColaboradorRepository,
+	departamentoRepo repository.DepartamentoRepository,
+) colaborador.UseCase {
+	return colaborador.NewUseCase(colaboradorRepo, departamentoRepo)
+}
+
+func NewDepartamentoUseCase(
+	departamentoRepo repository.DepartamentoRepository,
+	colaboradorRepo repository.ColaboradorRepository,
+) departamento.UseCase {
+	return departamento.NewUseCase(departamentoRepo, colaboradorRepo)
+}
+
+type RouteParams struct {
+	fx.In
+
+	Config              *config.Config
+	Router              *gin.Engine
+	ColaboradorHandler  *httpDelivery.ColaboradorHandler
+	DepartamentoHandler *httpDelivery.DepartamentoHandler
+	GerenteHandler      *httpDelivery.GerenteHandler
+	DocsHandler         *httpDelivery.DocsHandler
+}
+
+func RegisterLifecycle(lc fx.Lifecycle, p RouteParams) {
+	router.SetupRoutes(p.Router, p.ColaboradorHandler, p.DepartamentoHandler, p.GerenteHandler, p.DocsHandler)
+
+	lc.Append(fx.Hook{
+		OnStart: func(ctx context.Context) error {
+			go func() {
+				addr := fmt.Sprintf(":%s", p.Config.Server.Port)
+				log.Printf("Iniciando servidor na porta %s", p.Config.Server.Port)
+				log.Printf("Documentação da API disponível em:")
+				log.Printf("  - ReDoc:        http://localhost:%s/docs/redoc", p.Config.Server.Port)
+				log.Printf("  - Swagger UI:   http://localhost:%s/docs/swagger", p.Config.Server.Port)
+				log.Printf("  - Scalar:       http://localhost:%s/docs/scalar", p.Config.Server.Port)
+				log.Printf("  - OpenAPI Spec: http://localhost:%s/docs/openapi.yaml", p.Config.Server.Port)
+				if err := p.Router.Run(addr); err != nil {
+					log.Fatalf("Falha ao iniciar servidor: %v", err)
+				}
+			}()
+			return nil
+		},
+		OnStop: func(ctx context.Context) error {
+			log.Println("Desligando servidor...")
+			return nil
+		},
+	})
+}
