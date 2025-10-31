@@ -47,7 +47,7 @@ var Module = fx.Options(
 )
 
 func NewLogger(lc fx.Lifecycle, cfg *config.Config) (logger.Logger, error) {
-	log, err := logger.NewLogger(cfg.Server.Mode)
+	log, err := logger.NewLoggerWithConfig(cfg)
 	if err != nil {
 		return nil, err
 	}

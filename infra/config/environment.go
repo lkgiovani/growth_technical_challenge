@@ -8,8 +8,9 @@ import (
 
 type Config struct {
 	Server struct {
-		Port string
-		Mode string
+		Port     string
+		Mode     string
+		LogLevel string
 	}
 	Database struct {
 		Host     string
@@ -36,6 +37,11 @@ func NewConfig() (*Config, error) {
 	}
 
 	serverMode, err := getString("GIN_MODE", "debug")
+	if err != nil {
+		return nil, err
+	}
+
+	logLevel, err := getString("LOG_LEVEL", "debug")
 	if err != nil {
 		return nil, err
 	}
@@ -92,11 +98,13 @@ func NewConfig() (*Config, error) {
 
 	return &Config{
 		Server: struct {
-			Port string
-			Mode string
+			Port     string
+			Mode     string
+			LogLevel string
 		}{
-			Port: serverPort,
-			Mode: serverMode,
+			Port:     serverPort,
+			Mode:     serverMode,
+			LogLevel: logLevel,
 		},
 		Database: struct {
 			Host     string
@@ -172,4 +180,12 @@ func (c *Config) GetDatabaseDSN() string {
 		c.Database.DBName,
 		c.Database.SSLMode,
 	)
+}
+
+func (c *Config) GetLogLevel() string {
+	return c.Server.LogLevel
+}
+
+func (c *Config) GetServerMode() string {
+	return c.Server.Mode
 }
