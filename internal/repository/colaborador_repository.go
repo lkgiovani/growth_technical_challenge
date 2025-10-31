@@ -9,7 +9,9 @@ import (
 	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/pkg/cache"
+	"github.com/lkgiovani/growth_technical_challenge/pkg/logger"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -27,14 +29,16 @@ type ColaboradorRepository interface {
 }
 
 type colaboradorRepository struct {
-	db    *gorm.DB
-	cache cache.Cache
+	db     *gorm.DB
+	cache  cache.Cache
+	logger logger.Logger
 }
 
-func NewColaboradorRepository(db *gorm.DB, cacheClient cache.Cache) ColaboradorRepository {
+func NewColaboradorRepository(db *gorm.DB, cacheClient cache.Cache, log logger.Logger) ColaboradorRepository {
 	return &colaboradorRepository{
-		db:    db,
-		cache: cacheClient,
+		db:     db,
+		cache:  cacheClient,
+		logger: log,
 	}
 }
 
@@ -129,11 +133,12 @@ func (r *colaboradorRepository) FindByDepartmentIDs(departmentIDs []uuid.UUID) (
 			var colaboradores []entities.Colaborador
 			err := cache.GetJSON(ctx, r.cache, cacheKey, &colaboradores)
 			if err == nil {
+				r.logger.Debug("Cache hit for colaboradores by department", zap.String("departmentID", departmentIDs[0].String()))
 				return colaboradores, nil
 			}
 
 			if err != redis.Nil {
-				fmt.Printf("Erro no cache: %v\n", err)
+				r.logger.Warn("Cache error", zap.Error(err), zap.String("key", cacheKey))
 			}
 
 			result := r.db.Preload("Departamento").Where("departamento_id IN ?", departmentIDs).Find(&colaboradores)
@@ -142,7 +147,7 @@ func (r *colaboradorRepository) FindByDepartmentIDs(departmentIDs []uuid.UUID) (
 			}
 
 			if err := cache.SetJSON(ctx, r.cache, cacheKey, colaboradores); err != nil {
-				fmt.Printf("Falha ao cachear colaboradores por departamento: %v\n", err)
+				r.logger.Warn("Failed to cache colaboradores by department", zap.Error(err), zap.String("key", cacheKey))
 			}
 
 			return colaboradores, nil
@@ -160,7 +165,7 @@ func (r *colaboradorRepository) FindByDepartmentIDs(departmentIDs []uuid.UUID) (
 				result = append(result, colaboradores...)
 			} else {
 				if err != redis.Nil {
-					fmt.Printf("Erro no cache para dept %s: %v\n", deptID, err)
+					r.logger.Warn("Cache error for department", zap.Error(err), zap.String("departmentID", deptID.String()))
 				}
 				uncachedDeptIDs = append(uncachedDeptIDs, deptID)
 			}
@@ -181,7 +186,7 @@ func (r *colaboradorRepository) FindByDepartmentIDs(departmentIDs []uuid.UUID) (
 			for deptID, deptCols := range deptColsMap {
 				cacheKey := fmt.Sprintf("colaborador:dept:%s", deptID.String())
 				if err := cache.SetJSON(ctx, r.cache, cacheKey, deptCols); err != nil {
-					fmt.Printf("Falha ao cachear colaboradores do dept %s: %v\n", deptID, err)
+					r.logger.Warn("Failed to cache colaboradores for department", zap.Error(err), zap.String("departmentID", deptID.String()))
 				}
 			}
 
@@ -206,7 +211,7 @@ func (r *colaboradorRepository) Create(colaborador *entities.Colaborador) error 
 		ctx := context.Background()
 		cacheKey := fmt.Sprintf("colaborador:dept:%s", colaborador.DepartamentoID.String())
 		if err := r.cache.Del(ctx, cacheKey); err != nil {
-			fmt.Printf("Falha ao invalidar cache para %s: %v\n", cacheKey, err)
+			r.logger.Warn("Failed to invalidate cache", zap.Error(err), zap.String("key", cacheKey))
 		}
 	}
 	return nil
@@ -222,7 +227,7 @@ func (r *colaboradorRepository) Update(colaborador *entities.Colaborador) error 
 		ctx := context.Background()
 		cacheKey := fmt.Sprintf("colaborador:dept:%s", colaborador.DepartamentoID.String())
 		if err := r.cache.Del(ctx, cacheKey); err != nil {
-			fmt.Printf("Falha ao invalidar cache para %s: %v\n", cacheKey, err)
+			r.logger.Warn("Failed to invalidate cache", zap.Error(err), zap.String("key", cacheKey))
 		}
 	}
 	return nil
@@ -246,7 +251,7 @@ func (r *colaboradorRepository) Delete(id uuid.UUID) error {
 		ctx := context.Background()
 		cacheKey := fmt.Sprintf("colaborador:dept:%s", col.DepartamentoID.String())
 		if err := r.cache.Del(ctx, cacheKey); err != nil {
-			fmt.Printf("Falha ao invalidar cache para %s: %v\n", cacheKey, err)
+			r.logger.Warn("Failed to invalidate cache", zap.Error(err), zap.String("key", cacheKey))
 		}
 	}
 

@@ -9,7 +9,9 @@ import (
 	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/pkg/cache"
+	"github.com/lkgiovani/growth_technical_challenge/pkg/logger"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -28,14 +30,16 @@ type DepartamentoRepository interface {
 }
 
 type departamentoRepository struct {
-	db    *gorm.DB
-	cache cache.Cache
+	db     *gorm.DB
+	cache  cache.Cache
+	logger logger.Logger
 }
 
-func NewDepartamentoRepository(db *gorm.DB, cacheClient cache.Cache) DepartamentoRepository {
+func NewDepartamentoRepository(db *gorm.DB, cacheClient cache.Cache, log logger.Logger) DepartamentoRepository {
 	return &departamentoRepository{
-		db:    db,
-		cache: cacheClient,
+		db:     db,
+		cache:  cacheClient,
+		logger: log,
 	}
 }
 
@@ -77,7 +81,7 @@ func (r *departamentoRepository) FindByIDWithHierarchy(id uuid.UUID) (*entities.
 		}
 
 		if err != redis.Nil {
-			fmt.Printf("Erro no cache: %v\n", err)
+			r.logger.Warn("Cache error", zap.Error(err), zap.String("key", cacheKey))
 		}
 	}
 
@@ -163,7 +167,7 @@ func (r *departamentoRepository) FindByIDWithHierarchy(id uuid.UUID) (*entities.
 		ctx := context.Background()
 		cacheKey := fmt.Sprintf("departamento:hierarquia:%s", id.String())
 		if err := cache.SetJSON(ctx, r.cache, cacheKey, rootDept); err != nil {
-			fmt.Printf("Falha ao cachear hierarquia do departamento: %v\n", err)
+			r.logger.Warn("Failed to cache department hierarchy", zap.Error(err), zap.String("key", cacheKey))
 		}
 	}
 
@@ -216,7 +220,7 @@ func (r *departamentoRepository) FindAllSubDepartmentIDs(parentID uuid.UUID) ([]
 		}
 
 		if err != redis.Nil {
-			fmt.Printf("Erro no cache: %v\n", err)
+			r.logger.Warn("Cache error", zap.Error(err), zap.String("key", cacheKey))
 		}
 	}
 
@@ -244,7 +248,7 @@ func (r *departamentoRepository) FindAllSubDepartmentIDs(parentID uuid.UUID) ([]
 		ctx := context.Background()
 		cacheKey := fmt.Sprintf("departamento:subdept_ids:%s", parentID.String())
 		if err := cache.SetJSON(ctx, r.cache, cacheKey, ids); err != nil {
-			fmt.Printf("Falha ao cachear IDs dos subdepartamentos: %v\n", err)
+			r.logger.Warn("Failed to cache subdepartment IDs", zap.Error(err), zap.String("key", cacheKey))
 		}
 	}
 
@@ -306,7 +310,7 @@ func (r *departamentoRepository) Create(departamento *entities.Departamento) err
 		}
 		for _, pattern := range patterns {
 			if err := r.cache.Del(ctx, pattern); err != nil {
-				fmt.Printf("Falha ao invalidar cache para %s: %v\n", pattern, err)
+				r.logger.Warn("Failed to invalidate cache", zap.Error(err), zap.String("pattern", pattern))
 			}
 		}
 	}
@@ -334,7 +338,7 @@ func (r *departamentoRepository) Update(departamento *entities.Departamento) err
 		}
 		for _, pattern := range patterns {
 			if err := r.cache.Del(ctx, pattern); err != nil {
-				fmt.Printf("Falha ao invalidar cache para %s: %v\n", pattern, err)
+				r.logger.Warn("Failed to invalidate cache", zap.Error(err), zap.String("pattern", pattern))
 			}
 		}
 	}
@@ -370,7 +374,7 @@ func (r *departamentoRepository) Delete(id uuid.UUID) error {
 		}
 		for _, pattern := range patterns {
 			if err := r.cache.Del(ctx, pattern); err != nil {
-				fmt.Printf("Falha ao invalidar cache para %s: %v\n", pattern, err)
+				r.logger.Warn("Failed to invalidate cache", zap.Error(err), zap.String("pattern", pattern))
 			}
 		}
 	}
