@@ -1,28 +1,57 @@
 # Growth Technical Challenge
 
-RESTful API developed in Go using best practices and modern technologies with layered architecture.
+API RESTful desenvolvida em Go usando boas práticas e tecnologias modernas com arquitetura em camadas.
 
-## 🚀 Tech Stack
+## 🚀 Stack Tecnológico
 
-- **Language**: Go 1.23+
-- **HTTP Framework**: [Gin](https://github.com/gin-gonic/gin)
+- **Linguagem**: Go 1.23+
+- **Framework HTTP**: [Gin](https://github.com/gin-gonic/gin)
 - **ORM**: [GORM](https://gorm.io/)
-- **Database**: PostgreSQL 16
-- **Documentation**: TypeSpec + OpenAPI 3.1 (with ReDoc, Swagger UI, Scalar)
-- **Dependency Injection**: Uber FX
-- **Containerization**: Docker + Docker Compose
+- **Banco de Dados**: PostgreSQL 16
+- **Migrações**: Flyway 10
+- **Cache**: Redis 7
+- **Documentação**: TypeSpec + OpenAPI 3.1 (com ReDoc, Swagger UI, Scalar)
+- **Injeção de Dependências**: Uber FX
+- **Containerização**: Docker + Docker Compose
 
-## 📐 Architecture
+## 🚀 Quick Start
 
-The project follows a clean layered architecture:
+```bash
+# 1. Clone and enter directory
+git clone https://github.com/lkgiovani/growth_technical_challenge.git
+cd growth_technical_challenge
 
-- **Models**: Domain entities and database schemas
-- **Repositories**: Data access layer with interfaces
-- **Services**: Business logic and validation rules
-- **Handlers**: HTTP request/response handling
-- **Routes**: API endpoint definitions
+# 2. Copy environment file
+cp env.example .env
 
-## 📁 Project Structure
+# 3. Start everything with one command
+docker-compose up -d
+
+# 4. Wait a few seconds and check health
+curl http://localhost:8080/health
+
+# 5. Access documentation
+# Open http://localhost:8080/docs/swagger in your browser
+```
+
+That's it! The application is ready with:
+
+- ✅ PostgreSQL database running
+- ✅ All migrations applied by Flyway
+- ✅ Redis cache ready
+- ✅ API running on port 8080
+
+## 📐 Arquitetura
+
+O projeto segue uma arquitetura limpa em camadas:
+
+- **Models**: Entidades de domínio e schemas do banco de dados
+- **Repositories**: Camada de acesso a dados com interfaces
+- **Services**: Lógica de negócio e regras de validação
+- **Handlers**: Manipulação de requisições/respostas HTTP
+- **Routes**: Definições dos endpoints da API
+
+## 📁 Estrutura do Projeto
 
 ```
 .
@@ -62,74 +91,106 @@ The project follows a clean layered architecture:
 └── go.mod                   # Project dependencies
 ```
 
-## 🔧 Prerequisites
+## 🔧 Pré-requisitos
 
 - Docker & Docker Compose
-- Go 1.23+ (for local development)
-- Make (optional, for facilitated commands)
+- Go 1.23+ (para desenvolvimento local)
+- Make (opcional, para comandos facilitados)
 
-## 🐳 Running with Docker (Recommended)
+## 🐳 Executando com Docker (Recomendado)
 
-### 1. Clone the repository
+### 1. Clone o repositório
 
 ```bash
 git clone https://github.com/lkgiovani/growth_technical_challenge.git
 cd growth_technical_challenge
 ```
 
-### 2. Configure environment variables
+### 2. Configure as variáveis de ambiente
 
 ```bash
 cp env.example .env
 ```
 
-Edit the `.env` file as needed.
+Edite o arquivo `.env` conforme necessário.
 
-### 3. Start containers
+### 3. Inicie todos os serviços
+
+Com um **único comando**, o Docker Compose orquestrará todos os serviços na ordem correta:
+
+1. **PostgreSQL** - Inicia e aguarda até estar saudável
+2. **Flyway** - Executa as migrações do banco automaticamente
+3. **Redis** - Inicia o serviço de cache
+4. **Aplicação** - Inicia apenas após as migrações serem concluídas com sucesso
 
 ```bash
 docker-compose up -d
 ```
 
-Or using Make:
+Ou usando Make:
 
 ```bash
 make up
 ```
 
-### 4. Check logs
+Para acompanhar o processo de inicialização em tempo real (recomendado na primeira execução):
+
+```bash
+docker-compose up
+```
+
+### 4. Verifique se os serviços estão rodando
+
+Verifique o status de todos os serviços:
+
+```bash
+docker-compose ps
+```
+
+Verifique os logs da aplicação:
 
 ```bash
 docker-compose logs -f app
 ```
 
-Or:
+Verifique os logs das migrações do Flyway:
+
+```bash
+docker-compose logs flyway
+```
+
+Ou usando Make:
 
 ```bash
 make logs
+make logs-flyway
 ```
 
-The API will be available at:
+### 5. Acesse a aplicação
+
+A API estará disponível em:
 
 - **API**: http://localhost:8080
-- **Documentation**:
+- **Health Check**: http://localhost:8080/health
+- **Documentação**:
   - ReDoc: http://localhost:8080/docs/redoc
   - Swagger UI: http://localhost:8080/docs/swagger
   - Scalar: http://localhost:8080/docs/scalar
   - OpenAPI Spec: http://localhost:8080/docs/openapi.yaml
 - **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
 
-## 💻 Local Development
+## 💻 Desenvolvimento Local
 
-### 1. Install dependencies
+### 1. Instale as dependências
 
 ```bash
 go mod download
 ```
 
-### 2. Configure database
+### 2. Configure o banco de dados
 
-Make sure you have PostgreSQL running and configure environment variables:
+Certifique-se de ter o PostgreSQL rodando e configure as variáveis de ambiente:
 
 ```bash
 export DB_HOST=localhost
@@ -141,37 +202,37 @@ export DB_SSLMODE=disable
 export APP_PORT=8080
 ```
 
-### 3. Run the application
+### 3. Execute a aplicação
 
 ```bash
 go run cmd/main.go
 ```
 
-## 📊 Domain Model
+## 📊 Modelo de Domínio
 
-### Employee (Colaborador)
+### Colaborador (Employee)
 
-- **id** (UUIDv7) - Primary key
-- **name** (required) - Employee name
-- **cpf** (required, unique, validated) - Brazilian CPF
-- **rg** (optional, unique if provided) - Brazilian RG
-- **department_id** (FK to Department, required) - Department reference
+- **id** (UUIDv7) - Chave primária
+- **nome** (obrigatório) - Nome do colaborador
+- **cpf** (obrigatório, único, validado) - CPF brasileiro
+- **rg** (opcional, único se fornecido) - RG brasileiro
+- **departamento_id** (FK para Departamento, obrigatório) - Referência do departamento
 
-### Department (Departamento)
+### Departamento (Department)
 
-- **id** (UUIDv7) - Primary key
-- **name** (required) - Department name
-- **manager_id** (FK to Employee, required) - Manager reference
-- **parent_department_id** (FK optional to Department) - Parent department for hierarchy
+- **id** (UUIDv7) - Chave primária
+- **nome** (obrigatório) - Nome do departamento
+- **gerente_id** (FK para Colaborador, obrigatório) - Referência do gerente
+- **departamento_superior_id** (FK opcional para Departamento) - Departamento pai para hierarquia
 
-## 📚 Business Rules
+## 📚 Regras de Negócio
 
-1. **CPF must be unique and valid**
-2. **RG, if provided, must also be unique**
-3. **The manager must be an existing Employee linked to the same department**
-4. **The Parent Department is optional, but cannot create cycles in the hierarchy**
+1. **CPF deve ser único e válido**
+2. **RG, se fornecido, também deve ser único**
+3. **O gerente deve ser um Colaborador existente vinculado ao mesmo departamento**
+4. **O Departamento Superior é opcional, mas não pode criar ciclos na hierarquia**
 
-## 🔌 API Endpoints
+## 🔌 Endpoints da API
 
 ### Health Check
 
@@ -179,9 +240,9 @@ go run cmd/main.go
 GET /health
 ```
 
-### Employees
+### Colaboradores
 
-#### Create Employee
+#### Criar Colaborador
 
 ```bash
 POST /api/v1/employees
@@ -195,15 +256,15 @@ Content-Type: application/json
 }
 ```
 
-#### Get Employee by ID
+#### Buscar Colaborador por ID
 
 ```bash
-GET /api/v1/employees/:id
+GET /api/v1/colaboradores/:id
 ```
 
-Returns the employee and their department manager's name.
+Retorna o colaborador e o nome do gerente do departamento.
 
-#### Update Employee
+#### Atualizar Colaborador
 
 ```bash
 PUT /api/v1/employees/:id
@@ -217,15 +278,15 @@ Content-Type: application/json
 }
 ```
 
-#### Delete Employee
+#### Deletar Colaborador
 
 ```bash
-DELETE /api/v1/employees/:id
+DELETE /api/v1/colaboradores/:id
 ```
 
-Soft delete.
+Soft delete (exclusão lógica).
 
-#### List Employees with Filters
+#### Listar Colaboradores com Filtros
 
 ```bash
 POST /api/v1/employees/list
@@ -243,170 +304,405 @@ Content-Type: application/json
 }
 ```
 
-### Departments
+### Departamentos
 
-#### Create Department
+#### Criar Departamento
 
 ```bash
-POST /api/v1/departments
+POST /api/v1/departamentos
 Content-Type: application/json
 
 {
-  "name": "IT Department",
-  "manager_id": "uuid-here",
-  "parent_department_id": "uuid-here" // optional
+  "nome": "TI",
+  "gerente_id": "uuid-aqui",
+  "departamento_superior_id": "uuid-aqui" // opcional
 }
 ```
 
-Validates manager_id and prevents cycles.
+Valida gerente_id e previne ciclos.
 
-#### Get Department by ID
+#### Buscar Departamento por ID
 
 ```bash
-GET /api/v1/departments/:id
+GET /api/v1/departamentos/:id
 ```
 
-Returns department, manager, and complete hierarchical tree of subdepartments.
+Retorna departamento, gerente e árvore hierárquica completa de subdepartamentos.
 
-#### Update Department
+#### Atualizar Departamento
 
 ```bash
-PUT /api/v1/departments/:id
+PUT /api/v1/departamentos/:id
 Content-Type: application/json
 
 {
-  "name": "IT Department Updated",
-  "manager_id": "uuid-here",
-  "parent_department_id": "uuid-here"
+  "nome": "TI Atualizado",
+  "gerente_id": "uuid-aqui",
+  "departamento_superior_id": "uuid-aqui"
 }
 ```
 
-Prevents cycles in hierarchy.
+Previne ciclos na hierarquia.
 
-#### Delete Department
+#### Deletar Departamento
 
 ```bash
-DELETE /api/v1/departments/:id
+DELETE /api/v1/departamentos/:id
 ```
 
-#### List Departments with Filters
+#### Listar Departamentos com Filtros
 
 ```bash
-POST /api/v1/departments/list
+POST /api/v1/departamentos/list
 Content-Type: application/json
 
 {
   "filters": {
-    "name": "IT",
-    "manager_name": "John",
-    "parent_department_id": "uuid-here"
+    "nome": "TI",
+    "nome_gerente": "João",
+    "departamento_superior_id": "uuid-aqui"
   },
   "page": 1,
   "limit": 10
 }
 ```
 
-### Managers
+### Gerentes
 
-#### Get Manager's Employees
+#### Buscar Colaboradores do Gerente
 
 ```bash
-GET /api/v1/managers/:id/employees
+GET /api/v1/gerentes/:id/colaboradores
 ```
 
-Returns all employees from the manager's subordinate departments, recursively.
+Retorna todos os colaboradores dos departamentos subordinados do gerente, recursivamente.
 
-## ⚖️ HTTP Status Codes
+## ⚖️ Códigos de Status HTTP
 
-The API uses consistent error responses:
+A API usa respostas de erro consistentes:
 
-- **200 OK** - Successful request
-- **201 Created** - Resource created successfully
-- **400 Bad Request** - Invalid filters or malformed request
-- **404 Not Found** - Resource not found
-- **409 Conflict** - Uniqueness constraint violation (CPF, RG)
-- **422 Unprocessable Entity** - Domain validation error (invalid CPF, business rules)
-- **500 Internal Server Error** - Server error
+- **200 OK** - Requisição bem-sucedida
+- **201 Created** - Recurso criado com sucesso
+- **400 Bad Request** - Filtros inválidos ou requisição malformada
+- **404 Not Found** - Recurso não encontrado
+- **409 Conflict** - Violação de restrição de unicidade (CPF, RG)
+- **422 Unprocessable Entity** - Erro de validação de domínio (CPF inválido, regras de negócio)
+- **500 Internal Server Error** - Erro do servidor
 
 ## 🧪 Testing the API
 
-### Using curl
+### 1. Health Check
 
 ```bash
-# Health check
 curl http://localhost:8080/health
+```
 
-# Create employee
-curl -X POST http://localhost:8080/api/v1/employees \
+Expected response:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+### 2. Create Department
+
+```bash
+curl -X POST http://localhost:8080/api/v1/departments \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "John Doe",
+    "nome": "TI",
+    "gerente_id": "01234567-89ab-7def-0123-456789abcdef"
+  }'
+```
+
+### 3. Criar Colaborador
+
+```bash
+curl -X POST http://localhost:8080/api/v1/colaboradores \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "João Silva",
     "cpf": "12345678901",
     "rg": "123456789",
-    "department_id": "uuid-here"
+    "departamento_id": "01234567-89ab-7def-0123-456789abcdef"
   }'
+```
 
-# List employees with filters
-curl -X POST http://localhost:8080/api/v1/employees/list \
+### 4. Buscar Colaborador por ID
+
+```bash
+curl http://localhost:8080/api/v1/colaboradores/01234567-89ab-7def-0123-456789abcdef
+```
+
+### 5. Atualizar Colaborador
+
+```bash
+curl -X PUT http://localhost:8080/api/v1/colaboradores/01234567-89ab-7def-0123-456789abcdef \
   -H "Content-Type: application/json" \
   -d '{
-    "filters": {"name": "John"},
+    "nome": "João Silva Updated",
+    "cpf": "12345678901",
+    "rg": "987654321",
+    "departamento_id": "01234567-89ab-7def-0123-456789abcdef"
+  }'
+```
+
+### 6. Listar Colaboradores com Filtros
+
+```bash
+curl -X POST http://localhost:8080/api/v1/colaboradores/list \
+  -H "Content-Type: application/json" \
+  -d '{
+    "filters": {
+      "nome": "João"
+    },
     "page": 1,
     "limit": 10
   }'
 ```
 
-## 🛠️ Make Commands
+### 7. Deletar Colaborador (Soft Delete)
 
 ```bash
-make help      # Shows all available commands
-make build     # Build Docker images
-make up        # Start containers
-make down      # Stop containers
-make logs      # Show logs
-make restart   # Restart containers
-make clean     # Remove containers and volumes
-make test      # Run tests
+curl -X DELETE http://localhost:8080/api/v1/colaboradores/01234567-89ab-7def-0123-456789abcdef
 ```
 
-## 🗄️ Database
+### 8. Buscar Departamento com Hierarquia
 
-Migrations are automatically executed by GORM when starting the application. Tables are created based on models defined in `internal/models/`.
+```bash
+curl http://localhost:8080/api/v1/departamentos/01234567-89ab-7def-0123-456789abcdef
+```
 
-### Connect to PostgreSQL
+### 9. Buscar Colaboradores do Gerente
+
+```bash
+curl http://localhost:8080/api/v1/gerentes/01234567-89ab-7def-0123-456789abcdef/colaboradores
+```
+
+### Using Postman or Insomnia
+
+1. **Import OpenAPI Spec**:
+   - URL: `http://localhost:8080/docs/openapi.yaml`
+2. **Set Base URL**:
+
+   - `http://localhost:8080`
+
+3. **Use Interactive Swagger UI**:
+   - Access: http://localhost:8080/docs/swagger
+   - Click "Try it out" on any endpoint
+   - Fill in the parameters
+   - Click "Execute"
+
+## 🛠️ Comandos Make
+
+Se você tiver o `make` instalado, pode usar estes atalhos:
+
+```bash
+make up          # Inicia todos os serviços em background
+make down        # Para todos os serviços
+make run         # Inicia todos os serviços e mostra logs
+make logs        # Mostra logs da aplicação
+make logs-flyway # Mostra logs das migrações Flyway
+make restart     # Reinicia todos os serviços
+make clean       # Remove containers e volumes (início limpo)
+make build       # Reconstrói imagens Docker
+make rebuild     # Clean + build + start tudo
+make status      # Mostra status de todos os serviços
+```
+
+## 🗄️ Banco de Dados & Migrações
+
+### Migrações de Banco de Dados com Flyway
+
+Este projeto usa **Flyway** para controle de versão do banco de dados e migrações. Todos os arquivos de migração estão localizados em `infra/database/migrations/`.
+
+#### Convenção de Nomenclatura dos Arquivos de Migração
+
+O Flyway usa um padrão específico de nomenclatura:
+
+```
+V{versão}__{descrição}.sql
+```
+
+Exemplos:
+
+- `V1__create_departamentos.sql`
+- `V2__create_colaboradores.sql`
+- `V3__add_fk_colaboradores_departamento.sql`
+
+#### Como as Migrações Funcionam
+
+1. Quando você executa `docker-compose up`, o Flyway automaticamente:
+
+   - Conecta ao PostgreSQL
+   - Cria uma tabela `flyway_schema_history` para rastrear migrações
+   - Executa migrações pendentes em ordem (V1, V2, V3, etc.)
+   - Marca cada migração como aplicada
+   - Pula migrações já aplicadas
+
+2. A aplicação só inicia **após** todas as migrações serem concluídas com sucesso
+
+#### Executar Migrações Manualmente
+
+Para executar migrações separadamente:
+
+```bash
+docker-compose up flyway
+```
+
+Para ver o status das migrações:
+
+```bash
+docker-compose run --rm flyway info
+```
+
+Para validar migrações:
+
+```bash
+docker-compose run --rm flyway validate
+```
+
+#### Criar uma Nova Migração
+
+1. Crie um novo arquivo em `infra/database/migrations/`:
+
+   ```bash
+   touch infra/database/migrations/V6__add_new_feature.sql
+   ```
+
+2. Escreva seu SQL:
+
+   ```sql
+   ALTER TABLE colaboradores ADD COLUMN email VARCHAR(255);
+   ```
+
+3. Reinicie os serviços:
+   ```bash
+   docker-compose restart flyway app
+   ```
+
+### Conectar ao PostgreSQL
 
 ```bash
 docker exec -it growth_postgres psql -U postgres -d growth_db
 ```
 
-## 🔐 Environment Variables
+Verificar histórico de migrações:
 
-| Variable            | Description              | Default     |
+```sql
+SELECT * FROM flyway_schema_history;
+```
+
+## 🔐 Variáveis de Ambiente
+
+| Variável            | Descrição                | Padrão      |
 | ------------------- | ------------------------ | ----------- |
-| `POSTGRES_USER`     | PostgreSQL user          | `postgres`  |
-| `POSTGRES_PASSWORD` | PostgreSQL password      | `postgres`  |
-| `POSTGRES_DB`       | Database name            | `growth_db` |
-| `POSTGRES_PORT`     | PostgreSQL port          | `5432`      |
-| `DB_HOST`           | Database host            | `localhost` |
-| `DB_PORT`           | Database port            | `5432`      |
-| `DB_SSLMODE`        | PostgreSQL SSL mode      | `disable`   |
-| `APP_PORT`          | Application port         | `8080`      |
-| `GIN_MODE`          | Gin mode (debug/release) | `debug`     |
+| `POSTGRES_USER`     | Usuário PostgreSQL       | `postgres`  |
+| `POSTGRES_PASSWORD` | Senha PostgreSQL         | `postgres`  |
+| `POSTGRES_DB`       | Nome do banco de dados   | `growth_db` |
+| `POSTGRES_PORT`     | Porta PostgreSQL         | `5432`      |
+| `DB_HOST`           | Host do banco de dados   | `localhost` |
+| `DB_PORT`           | Porta do banco de dados  | `5432`      |
+| `DB_SSLMODE`        | Modo SSL PostgreSQL      | `disable`   |
+| `APP_PORT`          | Porta da aplicação       | `8080`      |
+| `GIN_MODE`          | Modo Gin (debug/release) | `debug`     |
 
-## 📖 API Documentation
+## 📖 Documentação da API
 
-This project uses **TypeSpec** for API documentation, providing multiple viewing options:
+Este projeto usa **TypeSpec** para gerar documentação OpenAPI 3.1, fornecendo múltiplos visualizadores interativos.
 
-### Documentation Viewers
+### 📚 Visualizadores de Documentação
 
-- **ReDoc**: http://localhost:8080/docs/redoc (Modern, clean interface)
-- **Swagger UI**: http://localhost:8080/docs/swagger (Interactive API explorer)
-- **Scalar**: http://localhost:8080/docs/scalar (Beautiful, modern UI)
-- **OpenAPI Spec**: http://localhost:8080/docs/openapi.yaml (Raw YAML file)
+Após iniciar a aplicação, acesse a documentação no seu navegador:
 
-### Generating TypeSpec Documentation
+#### 1. **Swagger UI** (Recomendado para Testes)
 
-To regenerate the OpenAPI specification from TypeSpec:
+- **URL**: http://localhost:8080/docs/swagger
+- **Recursos**:
+  - Explorador interativo da API
+  - Teste endpoints diretamente no navegador
+  - Veja exemplos de requisição/resposta
+  - Não precisa de ferramentas adicionais
+
+#### 2. **ReDoc**
+
+- **URL**: http://localhost:8080/docs/redoc
+- **Recursos**:
+  - Interface moderna e limpa
+  - Ótimo para ler e entender a API
+  - Funcionalidade de busca
+  - Amigável para impressão
+
+#### 3. **Scalar**
+
+- **URL**: http://localhost:8080/docs/scalar
+- **Recursos**:
+  - UI bonita e moderna
+  - Exemplos de código em múltiplas linguagens
+  - Playground da API
+
+#### 4. **OpenAPI Spec (YAML)**
+
+- **URL**: http://localhost:8080/docs/openapi.yaml
+- **Use para**:
+  - Importar no Postman/Insomnia
+  - Gerar SDKs de cliente
+  - Integração CI/CD
+
+### 🔧 Como Usar o Swagger UI
+
+1. Abra http://localhost:8080/docs/swagger no seu navegador
+
+2. Escolha um endpoint (ex: `POST /api/v1/colaboradores`)
+
+3. Clique em **"Try it out"**
+
+4. Preencha o corpo da requisição:
+
+   ```json
+   {
+     "nome": "João Silva",
+     "cpf": "12345678901",
+     "rg": "123456789",
+     "departamento_id": "01234567-89ab-7def-0123-456789abcdef"
+   }
+   ```
+
+5. Clique em **"Execute"**
+
+6. Veja a resposta abaixo com código de status, headers e body
+
+### 📥 Importar para o Postman
+
+1. Abra o Postman
+
+2. Clique em **Import** → **Link**
+
+3. Digite: `http://localhost:8080/docs/openapi.yaml`
+
+4. Clique em **Continue** → **Import**
+
+5. Todos os endpoints estarão disponíveis no Postman com:
+   - Requisições pré-configuradas
+   - Payloads de exemplo
+   - Descrições
+
+### 📥 Importar para o Insomnia
+
+1. Abra o Insomnia
+
+2. Clique em **Create** → **Import From** → **URL**
+
+3. Digite: `http://localhost:8080/docs/openapi.yaml`
+
+4. Clique em **Fetch and Import**
+
+5. Todos os endpoints prontos para usar!
+
+### 🔄 Regenerar Documentação
+
+Se você modificar os arquivos TypeSpec em `docs/`:
 
 ```bash
 cd docs
@@ -414,7 +710,7 @@ npm install
 npm run compile
 ```
 
-Or using Make:
+Ou usando Make:
 
 ```bash
 cd docs
@@ -422,44 +718,54 @@ make install
 make compile
 ```
 
-See [docs/README.md](docs/README.md) for more information about TypeSpec.
-
-## 🚀 Production Build
+Então reinicie a aplicação:
 
 ```bash
-# Build application
+docker-compose restart app
+```
+
+Veja [docs/README.md](docs/README.md) para mais informações sobre TypeSpec.
+
+## 🚀 Build de Produção
+
+```bash
+# Build da aplicação
 go build -o app cmd/main.go
 
-# Run
+# Executar
 ./app
 ```
 
-Or with Docker:
+Ou com Docker:
 
 ```bash
 docker build -t growth-app .
 docker run -p 8080:8080 growth-app
 ```
 
-## ✅ Features
+## ✅ Funcionalidades
 
-- ✅ Clean layered architecture (Models, Repositories, Services, Handlers)
-- ✅ UUID v7 for primary keys
-- ✅ CPF and RG validation
-- ✅ Prevention of cycles in department hierarchy
-- ✅ Soft delete on records
-- ✅ Pagination and filtering
-- ✅ Consistent error responses
-- ✅ Auto migrations with GORM
-- ✅ Swagger documentation
+- ✅ Arquitetura limpa em camadas (Models, Repositories, Services, Handlers)
+- ✅ UUID v7 para chaves primárias
+- ✅ Validação de CPF e RG
+- ✅ Prevenção de ciclos na hierarquia de departamentos
+- ✅ Soft delete em registros
+- ✅ Paginação e filtragem
+- ✅ Cache com Redis
+- ✅ Respostas de erro consistentes
+- ✅ Migrações de banco de dados com Flyway
+- ✅ Documentação TypeSpec + OpenAPI 3.1
+- ✅ Múltiplos visualizadores de documentação (Swagger UI, ReDoc, Scalar)
 - ✅ Docker multi-stage build
-- ✅ Comprehensive README
+- ✅ Orquestração de serviços com Docker Compose
+- ✅ Injeção de dependências com Uber FX
+- ✅ README completo
 
-## 📝 License
+## 📝 Licença
 
-This project was developed as a technical challenge.
+Este projeto foi desenvolvido como um desafio técnico.
 
-## 👤 Author
+## 👤 Autor
 
 **lkgiovani**
 
