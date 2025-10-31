@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="SwaggerUI" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <title>SwaggerUI</title>
     <link
       rel="stylesheet"
@@ -20,7 +21,7 @@
     <script>
       window.onload = () => {
         window.ui = SwaggerUIBundle({
-          url: "/docs/openapi.yaml",
+          url: "./openapi.yaml",
           dom_id: "#swagger-ui",
         });
       };

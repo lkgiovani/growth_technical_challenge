@@ -7,7 +7,7 @@ import "./operations.tsp";
 using TypeSpec.Http;
 using TypeSpec.Rest;
 
-@service({
+@service(#{
   title: "API - Desafio Técnico Growth"
 })
 @server("http://localhost:8080/api/v1", "Servidor de desenvolvimento")

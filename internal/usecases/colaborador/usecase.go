@@ -40,6 +40,8 @@ func (u *usecase) GetColaboradorByID(id uuid.UUID) (*entities.Colaborador, error
 }
 
 func (u *usecase) CreateColaborador(colaborador *entities.Colaborador) error {
+	colaborador.ID = uuid.Nil
+
 	if err := u.validateColaborador(colaborador); err != nil {
 		return err
 	}
@@ -93,21 +95,35 @@ func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colabora
 		return err
 	}
 
-	if errValidate := u.validateColaborador(colaborador); errValidate != nil {
-		return errValidate
+	if colaborador.Nome != "" {
+		nome := strings.TrimSpace(colaborador.Nome)
+		if nome == "" {
+			return app.Errorf(app.EINVALID, "nome não pode ser vazio")
+		}
+		if len(nome) < 3 {
+			return app.Errorf(app.EINVALID, "nome deve ter pelo menos 3 caracteres")
+		}
+		if len(nome) > 255 {
+			return app.Errorf(app.EINVALID, "nome não pode exceder 255 caracteres")
+		}
+		existingColaborador.Nome = nome
 	}
 
-	colaborador.CPF = utils.NormalizeCPF(colaborador.CPF)
-	if !utils.ValidateCPF(colaborador.CPF) {
-		return app.Errorf(app.EINVALID, "CPF inválido")
-	}
+	if colaborador.CPF != "" {
+		cpfNormalizado := utils.NormalizeCPF(colaborador.CPF)
+		if !utils.ValidateCPF(cpfNormalizado) {
+			return app.Errorf(app.EINVALID, "CPF inválido")
+		}
 
-	cpfColaborador, err := u.colaboradorRepo.FindByCPF(colaborador.CPF)
-	if err != nil {
-		return err
-	}
-	if cpfColaborador != nil && cpfColaborador.ID != id {
-		return app.Errorf(app.EDUPLICATION, "CPF já existe")
+		cpfColaborador, err := u.colaboradorRepo.FindByCPF(cpfNormalizado)
+		if err != nil {
+			return err
+		}
+		if cpfColaborador != nil && cpfColaborador.ID != id {
+			return app.Errorf(app.EDUPLICATION, "CPF já existe")
+		}
+
+		existingColaborador.CPF = cpfNormalizado
 	}
 
 	if colaborador.RG != nil && *colaborador.RG != "" {
@@ -121,20 +137,21 @@ func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colabora
 		if rgColaborador != nil && rgColaborador.ID != id {
 			return app.Errorf(app.EDUPLICATION, "RG já existe")
 		}
+
+		existingColaborador.RG = colaborador.RG
 	}
 
-	departamento, errDept := u.departamentoRepo.FindByID(colaborador.DepartamentoID)
-	if errDept != nil {
-		return errDept
-	}
-	if departamento == nil {
-		return app.Errorf(app.ENOTFOUND, "departamento não encontrado")
-	}
+	if colaborador.DepartamentoID != uuid.Nil {
+		departamento, errDept := u.departamentoRepo.FindByID(colaborador.DepartamentoID)
+		if errDept != nil {
+			return errDept
+		}
+		if departamento == nil {
+			return app.Errorf(app.ENOTFOUND, "departamento não encontrado")
+		}
 
-	existingColaborador.Nome = strings.TrimSpace(colaborador.Nome)
-	existingColaborador.CPF = colaborador.CPF
-	existingColaborador.RG = colaborador.RG
-	existingColaborador.DepartamentoID = colaborador.DepartamentoID
+		existingColaborador.DepartamentoID = colaborador.DepartamentoID
+	}
 
 	return u.colaboradorRepo.Update(existingColaborador)
 }

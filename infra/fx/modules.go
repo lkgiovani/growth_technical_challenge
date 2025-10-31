@@ -113,8 +113,9 @@ func NewColaboradorUseCase(
 func NewDepartamentoUseCase(
 	departamentoRepo repository.DepartamentoRepository,
 	colaboradorRepo repository.ColaboradorRepository,
+	db *gorm.DB,
 ) departamento.UseCase {
-	return departamento.NewUseCase(departamentoRepo, colaboradorRepo)
+	return departamento.NewUseCase(departamentoRepo, colaboradorRepo, db)
 }
 
 type RouteParams struct {

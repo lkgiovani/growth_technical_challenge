@@ -23,8 +23,8 @@ func (h *GerenteHandler) GetGerenteColaboradores(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "ID de gerente inválido",
-			Message: "ID deve ser um UUID válido",
+			Error:   "Invalid manager ID",
+			Message: "ID must be a valid UUID",
 		})
 		return
 	}
@@ -39,7 +39,7 @@ func (h *GerenteHandler) GetGerenteColaboradores(c *gin.Context) {
 			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
-			Error:   "Falha ao recuperar colaboradores do gerente",
+			Error:   "Failed to retrieve manager employees",
 			Message: app.ErrorMessage(err),
 		})
 		return

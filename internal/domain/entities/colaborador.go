@@ -21,7 +21,7 @@ type Colaborador struct {
 
 func (c *Colaborador) BeforeCreate(tx *gorm.DB) error {
 	if c.ID == uuid.Nil {
-		c.ID = uuid.New()
+		c.ID = uuid.Must(uuid.NewV7())
 	}
 	return nil
 }

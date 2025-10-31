@@ -58,7 +58,7 @@ func (r *departamentoRepository) FindByID(id uuid.UUID) (*entities.Departamento,
 		First(&departamento, "id = ?", id)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, app.Errorf(app.ENOTFOUND, "departamento não encontrado")
+			return nil, app.Errorf(app.ENOTFOUND, "department not found")
 		}
 		return nil, result.Error
 	}
@@ -126,7 +126,7 @@ func (r *departamentoRepository) FindByIDWithHierarchy(id uuid.UUID) (*entities.
 	}
 
 	if len(hierarchy) == 0 {
-		return nil, app.Errorf(app.ENOTFOUND, "departamento não encontrado")
+		return nil, app.Errorf(app.ENOTFOUND, "department not found")
 	}
 
 	deptMap := make(map[uuid.UUID]*entities.Departamento)
@@ -315,7 +315,7 @@ func (r *departamentoRepository) Create(departamento *entities.Departamento) err
 }
 
 func (r *departamentoRepository) Update(departamento *entities.Departamento) error {
-	err := r.db.Save(departamento).Error
+	err := r.db.Model(departamento).Updates(departamento).Error
 	if err != nil {
 		return err
 	}
@@ -353,7 +353,7 @@ func (r *departamentoRepository) Delete(id uuid.UUID) error {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return app.Errorf(app.ENOTFOUND, "departamento não encontrado")
+		return app.Errorf(app.ENOTFOUND, "department not found")
 	}
 
 	if r.cache != nil {

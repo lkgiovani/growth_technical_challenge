@@ -1,14 +1,19 @@
 package database
 
 import (
+	"embed"
 	"log"
 	"os"
+	"sort"
+	"strings"
 
-	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 var DB *gorm.DB
 
@@ -17,8 +22,7 @@ func Connect() error {
 
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
-		Logger:                                   logger.Default.LogMode(logger.Info),
-		DisableForeignKeyConstraintWhenMigrating: true,
+		Logger: logger.Default.LogMode(logger.Info),
 	})
 
 	if err != nil {
@@ -37,11 +41,46 @@ func Connect() error {
 func AutoMigrate() error {
 	log.Println("Running auto migrations...")
 
-	if err := DB.AutoMigrate(
-		&entities.Departamento{},
-		&entities.Colaborador{},
-	); err != nil {
+	entries, err := migrationsFS.ReadDir("migrations")
+	if err != nil {
 		return err
+	}
+
+	var migrationFiles []string
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".sql") {
+			migrationFiles = append(migrationFiles, entry.Name())
+		}
+	}
+
+	sort.Strings(migrationFiles)
+
+	for _, filename := range migrationFiles {
+		log.Printf("Running migration: %s", filename)
+
+		content, err := migrationsFS.ReadFile("migrations/" + filename)
+		if err != nil {
+			log.Printf("Error reading migration file %s: %v", filename, err)
+			continue
+		}
+
+		statements := strings.Split(string(content), ";")
+		for _, stmt := range statements {
+			stmt = strings.TrimSpace(stmt)
+			if stmt == "" {
+				continue
+			}
+
+			if err := DB.Exec(stmt).Error; err != nil {
+				if strings.Contains(err.Error(), "already exists") ||
+					strings.Contains(err.Error(), "duplicate key") ||
+					strings.Contains(err.Error(), "relation") && strings.Contains(err.Error(), "already exists") {
+					log.Printf("Migration %s already applied (skipping): %v", filename, err)
+					continue
+				}
+				log.Printf("Warning: Error executing migration %s: %v", filename, err)
+			}
+		}
 	}
 
 	log.Println("Auto migrations completed successfully")
