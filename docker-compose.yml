@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: growth_postgres
+    env_file:
+      - .env
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -21,6 +23,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: growth_redis
+    env_file:
+      - .env
     ports:
       - "${REDIS_PORT:-6379}:6379"
     networks:
@@ -37,6 +41,8 @@ services:
   flyway:
     image: flyway/flyway:10-alpine
     container_name: growth_flyway
+    env_file:
+      - .env
     environment:
       - FLYWAY_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-growth_db}
       - FLYWAY_USER=${POSTGRES_USER:-postgres}
@@ -54,6 +60,8 @@ services:
 
   prometheus:
     image: prom/prometheus:latest
+    env_file:
+      - .env
     container_name: growth_prometheus
     ports:
       - "${PROMETHEUS_PORT:-9090}:9090"
@@ -74,6 +82,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: growth_app
+    env_file:
+      - .env
     ports:
       - "${APP_PORT:-8080}:8080"
     environment:
@@ -88,7 +98,8 @@ services:
       REDIS_PASSWORD: ""
       CACHE_TTL: "300"
       APP_PORT: "8080"
-      GIN_MODE: ${GIN_MODE:-debug}
+      GIN_MODE: ${GIN_MODE:-release}
+      LOG_LEVEL: ${LOG_LEVEL:-none}
     depends_on:
       postgres:
         condition: service_healthy
