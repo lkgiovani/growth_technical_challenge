@@ -9,6 +9,9 @@ COPY ./ ./
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /app ./cmd/main.go
 
 
+
+
+
 # Docs Build
 FROM node:22-slim AS docs
 WORKDIR /docs
