@@ -34,6 +34,24 @@ services:
       - redis_data:/data
     command: redis-server --appendonly yes
 
+  flyway:
+    image: flyway/flyway:10-alpine
+    container_name: growth_flyway
+    environment:
+      - FLYWAY_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-growth_db}
+      - FLYWAY_USER=${POSTGRES_USER:-postgres}
+      - FLYWAY_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - FLYWAY_CONNECT_RETRIES=60
+      - FLYWAY_BASELINE_ON_MIGRATE=true
+    volumes:
+      - ./infra/database/migrations:/flyway/sql
+    command: migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - growth_network
+
   app:
     build:
       context: .
@@ -59,6 +77,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
     networks:
       - growth_network
 
