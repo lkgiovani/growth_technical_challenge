@@ -7,18 +7,22 @@ import (
 	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/repository"
+	"github.com/lkgiovani/growth_technical_challenge/pkg/logger"
 	"github.com/lkgiovani/growth_technical_challenge/pkg/utils"
+	"go.uber.org/zap"
 )
 
 type usecase struct {
 	colaboradorRepo  repository.ColaboradorRepository
 	departamentoRepo repository.DepartamentoRepository
+	logger           logger.Logger
 }
 
-func NewUseCase(colaboradorRepo repository.ColaboradorRepository, departamentoRepo repository.DepartamentoRepository) UseCase {
+func NewUseCase(colaboradorRepo repository.ColaboradorRepository, departamentoRepo repository.DepartamentoRepository, log logger.Logger) UseCase {
 	return &usecase{
 		colaboradorRepo:  colaboradorRepo,
 		departamentoRepo: departamentoRepo,
+		logger:           log,
 	}
 }
 
@@ -43,19 +47,23 @@ func (u *usecase) CreateColaborador(colaborador *entities.Colaborador) error {
 	colaborador.ID = uuid.Nil
 
 	if err := u.validateColaborador(colaborador); err != nil {
+		u.logger.Warn("Colaborador validation failed", zap.Error(err), zap.String("name", colaborador.Nome))
 		return err
 	}
 
 	colaborador.CPF = utils.NormalizeCPF(colaborador.CPF)
 	if !utils.ValidateCPF(colaborador.CPF) {
+		u.logger.Warn("Invalid CPF", zap.String("cpf", colaborador.CPF))
 		return app.Errorf(app.EINVALID, "CPF inválido")
 	}
 
 	existingColaborador, err := u.colaboradorRepo.FindByCPF(colaborador.CPF)
 	if err != nil {
+		u.logger.Error("Failed to check existing CPF", zap.Error(err), zap.String("cpf", colaborador.CPF))
 		return err
 	}
 	if existingColaborador != nil {
+		u.logger.Warn("CPF already exists", zap.String("cpf", colaborador.CPF))
 		return app.Errorf(app.EDUPLICATION, "CPF já existe")
 	}
 
@@ -65,33 +73,42 @@ func (u *usecase) CreateColaborador(colaborador *entities.Colaborador) error {
 
 		existingRG, errRG := u.colaboradorRepo.FindByRG(*colaborador.RG)
 		if errRG != nil {
+			u.logger.Error("Failed to check existing RG", zap.Error(errRG), zap.String("rg", *colaborador.RG))
 			return errRG
 		}
 		if existingRG != nil {
+			u.logger.Warn("RG already exists", zap.String("rg", *colaborador.RG))
 			return app.Errorf(app.EDUPLICATION, "RG já existe")
 		}
 	}
 
 	departamento, errDept := u.departamentoRepo.FindByID(colaborador.DepartamentoID)
 	if errDept != nil {
+		u.logger.Error("Failed to find department", zap.Error(errDept), zap.String("departmentID", colaborador.DepartamentoID.String()))
 		return errDept
 	}
 	if departamento == nil {
+		u.logger.Warn("Department not found", zap.String("departmentID", colaborador.DepartamentoID.String()))
 		return app.Errorf(app.ENOTFOUND, "departamento não encontrado")
 	}
 
 	colaborador.Nome = strings.TrimSpace(colaborador.Nome)
 
+	u.logger.Debug("Creating colaborador in repository", zap.String("name", colaborador.Nome), zap.String("cpf", colaborador.CPF))
 	return u.colaboradorRepo.Create(colaborador)
 }
 
 func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colaborador) error {
 	if id == uuid.Nil {
+		u.logger.Warn("Invalid colaborador ID", zap.String("id", id.String()))
 		return app.Errorf(app.EINVALID, "ID de colaborador inválido")
 	}
 
+	u.logger.Debug("Updating colaborador", zap.String("id", id.String()))
+
 	existingColaborador, err := u.colaboradorRepo.FindByID(id)
 	if err != nil {
+		u.logger.Error("Failed to find colaborador", zap.Error(err), zap.String("id", id.String()))
 		return err
 	}
 
@@ -112,14 +129,17 @@ func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colabora
 	if colaborador.CPF != "" {
 		cpfNormalizado := utils.NormalizeCPF(colaborador.CPF)
 		if !utils.ValidateCPF(cpfNormalizado) {
+			u.logger.Warn("Invalid CPF on update", zap.String("cpf", cpfNormalizado), zap.String("id", id.String()))
 			return app.Errorf(app.EINVALID, "CPF inválido")
 		}
 
 		cpfColaborador, err := u.colaboradorRepo.FindByCPF(cpfNormalizado)
 		if err != nil {
+			u.logger.Error("Failed to check existing CPF on update", zap.Error(err), zap.String("cpf", cpfNormalizado))
 			return err
 		}
 		if cpfColaborador != nil && cpfColaborador.ID != id {
+			u.logger.Warn("CPF already exists on update", zap.String("cpf", cpfNormalizado), zap.String("id", id.String()))
 			return app.Errorf(app.EDUPLICATION, "CPF já existe")
 		}
 
@@ -158,11 +178,15 @@ func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colabora
 
 func (u *usecase) DeleteColaborador(id uuid.UUID) error {
 	if id == uuid.Nil {
+		u.logger.Warn("Invalid colaborador ID for deletion", zap.String("id", id.String()))
 		return app.Errorf(app.EINVALID, "ID de colaborador inválido")
 	}
 
+	u.logger.Debug("Deleting colaborador", zap.String("id", id.String()))
+
 	_, err := u.colaboradorRepo.FindByID(id)
 	if err != nil {
+		u.logger.Error("Failed to find colaborador for deletion", zap.Error(err), zap.String("id", id.String()))
 		return err
 	}
 
