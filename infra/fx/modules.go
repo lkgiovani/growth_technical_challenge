@@ -114,17 +114,20 @@ func NewRedisClient(lc fx.Lifecycle, cfg *config.Config, log logger.Logger) (pkg
 	return redisClient, nil
 }
 
+type LoggerMiddleware gin.HandlerFunc
+type RecoveryMiddleware gin.HandlerFunc
+
 func NewRouter(cfg *config.Config) *gin.Engine {
 	gin.SetMode(cfg.Server.Mode)
 	return gin.New()
 }
 
-func NewLoggerMiddleware(log logger.Logger) gin.HandlerFunc {
-	return middleware.Logger(log)
+func NewLoggerMiddleware(log logger.Logger) LoggerMiddleware {
+	return LoggerMiddleware(middleware.Logger(log))
 }
 
-func NewRecoveryMiddleware(log logger.Logger) gin.HandlerFunc {
-	return middleware.Recovery(log)
+func NewRecoveryMiddleware(log logger.Logger) RecoveryMiddleware {
+	return RecoveryMiddleware(middleware.Recovery(log))
 }
 
 func NewColaboradorRepository(db *gorm.DB, cache pkgCache.Cache, log logger.Logger) repository.ColaboradorRepository {
@@ -168,13 +171,13 @@ type RouteParams struct {
 	GerenteHandler      *httpDelivery.GerenteHandler
 	DocsHandler         *httpDelivery.DocsHandler
 	PrometheusMetrics   *middleware.PrometheusMetrics
-	LoggerMiddleware    gin.HandlerFunc
-	RecoveryMiddleware  gin.HandlerFunc
+	LoggerMiddleware    LoggerMiddleware
+	RecoveryMiddleware  RecoveryMiddleware
 	Logger              logger.Logger
 }
 
 func RegisterLifecycle(lc fx.Lifecycle, p RouteParams) {
-	router.SetupRoutes(p.Router, p.ColaboradorHandler, p.DepartamentoHandler, p.GerenteHandler, p.DocsHandler, p.PrometheusMetrics, p.LoggerMiddleware, p.RecoveryMiddleware)
+	router.SetupRoutes(p.Router, p.ColaboradorHandler, p.DepartamentoHandler, p.GerenteHandler, p.DocsHandler, p.PrometheusMetrics, gin.HandlerFunc(p.LoggerMiddleware), gin.HandlerFunc(p.RecoveryMiddleware))
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
