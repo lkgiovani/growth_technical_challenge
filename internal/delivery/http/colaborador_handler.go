@@ -9,34 +9,34 @@ import (
 	"github.com/lkgiovani/growth_technical_challenge/internal/delivery/http/dto"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/colaborador"
+	"github.com/lkgiovani/growth_technical_challenge/pkg/logger"
+	"go.uber.org/zap"
 )
 
 type ColaboradorHandler struct {
 	colaboradorUseCase colaborador.UseCase
+	errorHandler       func(c *gin.Context, err error)
+	logger             logger.Logger
 }
 
-func NewColaboradorHandler(colaboradorUseCase colaborador.UseCase) *ColaboradorHandler {
+func NewColaboradorHandler(colaboradorUseCase colaborador.UseCase, errorHandler func(c *gin.Context, err error), log logger.Logger) *ColaboradorHandler {
 	return &ColaboradorHandler{
 		colaboradorUseCase: colaboradorUseCase,
+		errorHandler:       errorHandler,
+		logger:             log,
 	}
 }
 
 func (h *ColaboradorHandler) GetColaborador(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Invalid employee ID",
-			Message: "ID must be a valid UUID",
-		})
+		h.errorHandler(c, app.Errorf(app.EINVALID, "ID must be a valid UUID"))
 		return
 	}
 
 	colaborador, err := h.colaboradorUseCase.GetColaboradorByID(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "Employee not found",
-			Message: err.Error(),
-		})
+		h.errorHandler(c, err)
 		return
 	}
 
@@ -49,12 +49,11 @@ func (h *ColaboradorHandler) CreateColaborador(c *gin.Context) {
 	var req dto.CreateColaboradorRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Invalid request body",
-			Message: err.Error(),
-		})
+		h.errorHandler(c, app.Errorf(app.EINVALID, "Invalid request body: %v", err))
 		return
 	}
+
+	h.logger.Info("Creating colaborador", zap.String("name", req.Nome), zap.String("cpf", req.CPF))
 
 	colaborador := &entities.Colaborador{
 		Nome:           req.Nome,
@@ -64,21 +63,12 @@ func (h *ColaboradorHandler) CreateColaborador(c *gin.Context) {
 	}
 
 	if err := h.colaboradorUseCase.CreateColaborador(colaborador); err != nil {
-		statusCode := http.StatusUnprocessableEntity
-		switch app.ErrorCode(err) {
-		case app.EDUPLICATION:
-			statusCode = http.StatusConflict
-		case app.ENOTFOUND:
-			statusCode = http.StatusNotFound
-		case app.EINVALID:
-			statusCode = http.StatusBadRequest
-		}
-		c.JSON(statusCode, ErrorResponse{
-			Error:   "Failed to create employee",
-			Message: app.ErrorMessage(err),
-		})
+		h.logger.Error("Failed to create colaborador", zap.Error(err), zap.String("cpf", req.CPF))
+		h.errorHandler(c, err)
 		return
 	}
+
+	h.logger.Info("Colaborador created successfully", zap.String("id", colaborador.ID.String()), zap.String("name", colaborador.Nome))
 
 	c.JSON(http.StatusCreated, SuccessResponse{
 		Message: "Employee created successfully",
@@ -89,19 +79,15 @@ func (h *ColaboradorHandler) CreateColaborador(c *gin.Context) {
 func (h *ColaboradorHandler) UpdateColaborador(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Invalid employee ID",
-			Message: "ID must be a valid UUID",
-		})
+		h.errorHandler(c, app.Errorf(app.EINVALID, "ID must be a valid UUID"))
 		return
 	}
 
+	h.logger.Info("Updating colaborador", zap.String("id", id.String()))
+
 	var req dto.UpdateColaboradorRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Invalid request body",
-			Message: err.Error(),
-		})
+		h.errorHandler(c, app.Errorf(app.EINVALID, "Invalid request body: %v", err))
 		return
 	}
 
@@ -126,21 +112,12 @@ func (h *ColaboradorHandler) UpdateColaborador(c *gin.Context) {
 	}
 
 	if err := h.colaboradorUseCase.UpdateColaborador(id, colaborador); err != nil {
-		statusCode := http.StatusUnprocessableEntity
-		switch app.ErrorCode(err) {
-		case app.ENOTFOUND:
-			statusCode = http.StatusNotFound
-		case app.EDUPLICATION:
-			statusCode = http.StatusConflict
-		case app.EINVALID:
-			statusCode = http.StatusBadRequest
-		}
-		c.JSON(statusCode, ErrorResponse{
-			Error:   "Failed to update employee",
-			Message: app.ErrorMessage(err),
-		})
+		h.logger.Error("Failed to update colaborador", zap.Error(err), zap.String("id", id.String()))
+		h.errorHandler(c, err)
 		return
 	}
+
+	h.logger.Info("Colaborador updated successfully", zap.String("id", id.String()))
 
 	updatedColaborador, _ := h.colaboradorUseCase.GetColaboradorByID(id)
 
@@ -153,27 +130,19 @@ func (h *ColaboradorHandler) UpdateColaborador(c *gin.Context) {
 func (h *ColaboradorHandler) DeleteColaborador(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Invalid employee ID",
-			Message: "ID must be a valid UUID",
-		})
+		h.errorHandler(c, app.Errorf(app.EINVALID, "ID must be a valid UUID"))
 		return
 	}
 
+	h.logger.Info("Deleting colaborador", zap.String("id", id.String()))
+
 	if err := h.colaboradorUseCase.DeleteColaborador(id); err != nil {
-		statusCode := http.StatusInternalServerError
-		switch app.ErrorCode(err) {
-		case app.ENOTFOUND:
-			statusCode = http.StatusNotFound
-		case app.EINVALID:
-			statusCode = http.StatusBadRequest
-		}
-		c.JSON(statusCode, ErrorResponse{
-			Error:   "Failed to delete employee",
-			Message: app.ErrorMessage(err),
-		})
+		h.logger.Error("Failed to delete colaborador", zap.Error(err), zap.String("id", id.String()))
+		h.errorHandler(c, err)
 		return
 	}
+
+	h.logger.Info("Colaborador deleted successfully", zap.String("id", id.String()))
 
 	c.JSON(http.StatusOK, SuccessResponse{
 		Message: "Employee deleted successfully",
@@ -183,10 +152,7 @@ func (h *ColaboradorHandler) DeleteColaborador(c *gin.Context) {
 func (h *ColaboradorHandler) ListColaboradores(c *gin.Context) {
 	var req ListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Invalid request body",
-			Message: err.Error(),
-		})
+		h.errorHandler(c, app.Errorf(app.EINVALID, "Invalid request body: %v", err))
 		return
 	}
 
@@ -201,10 +167,7 @@ func (h *ColaboradorHandler) ListColaboradores(c *gin.Context) {
 
 	colaboradores, total, err := h.colaboradorUseCase.ListColaboradores(req.Filters, req.Limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "Failed to list employees",
-			Message: err.Error(),
-		})
+		h.errorHandler(c, err)
 		return
 	}
 

@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	httpDelivery "github.com/lkgiovani/growth_technical_challenge/internal/delivery/http"
+	"github.com/lkgiovani/growth_technical_challenge/internal/delivery/http/middleware"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func SetupRoutes(
@@ -13,7 +15,16 @@ func SetupRoutes(
 	departamentoHandler *httpDelivery.DepartamentoHandler,
 	gerenteHandler *httpDelivery.GerenteHandler,
 	docsHandler *httpDelivery.DocsHandler,
+	prometheusMetrics *middleware.PrometheusMetrics,
+	loggerMiddleware gin.HandlerFunc,
+	recoveryMiddleware gin.HandlerFunc,
 ) {
+	r.Use(recoveryMiddleware)
+	r.Use(loggerMiddleware)
+	r.Use(prometheusMetrics.Middleware())
+
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
 	r.LoadHTMLGlob("docs/schema/*.html")
 
 	r.GET("/favicon.ico", httpDelivery.ServeFavicon)
