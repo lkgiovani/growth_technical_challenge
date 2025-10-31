@@ -1,231 +1,49 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-br">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
-    <title>Growth Technical Challenge API</title>
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Oxygen, Ubuntu, Cantarell, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 20px;
-      }
-
-      .container {
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        max-width: 800px;
-        width: 100%;
-        padding: 50px;
-        animation: fadeIn 0.6s ease-out;
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      h1 {
-        color: #2d3748;
-        font-size: 2.5rem;
-        margin-bottom: 10px;
-        text-align: center;
-      }
-
-      .version {
-        text-align: center;
-        color: #718096;
-        font-size: 0.9rem;
-        margin-bottom: 30px;
-      }
-
-      .intro {
-        color: #4a5568;
-        line-height: 1.8;
-        margin-bottom: 40px;
-        text-align: center;
-      }
-
-      .intro-title {
-        font-size: 1.2rem;
-        color: #667eea;
-        font-weight: 600;
-        margin-bottom: 15px;
-      }
-
-      .docs-section {
-        margin-top: 40px;
-      }
-
-      .docs-title {
-        color: #2d3748;
-        font-size: 1.5rem;
-        margin-bottom: 20px;
-        text-align: center;
-      }
-
-      .docs-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 15px;
-      }
-
-      .doc-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 12px;
-        padding: 20px;
-        text-align: center;
-        transition: transform 0.3s ease, box-shadow 0.3s ease;
-        cursor: pointer;
-        text-decoration: none;
-      }
-
-      .doc-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-      }
-
-      .doc-card-title {
-        color: white;
-        font-size: 1.2rem;
-        font-weight: 600;
-        margin-bottom: 8px;
-      }
-
-      .doc-card-desc {
-        color: rgba(255, 255, 255, 0.9);
-        font-size: 0.85rem;
-      }
-
-      .features {
-        margin-top: 40px;
-        padding: 25px;
-        background: #f7fafc;
-        border-radius: 12px;
-      }
-
-      .features-title {
-        color: #2d3748;
-        font-size: 1.1rem;
-        font-weight: 600;
-        margin-bottom: 15px;
-        text-align: center;
-      }
-
-      .features-list {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 12px;
-        list-style: none;
-      }
-
-      .features-list li {
-        color: #4a5568;
-        padding: 8px 0;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-      }
-
-      .features-list li:before {
-        content: "✓";
-        color: #667eea;
-        font-weight: bold;
-        font-size: 1.2rem;
-      }
-
-      .footer {
-        margin-top: 30px;
-        text-align: center;
-        color: #a0aec0;
-        font-size: 0.85rem;
-      }
-
-      @media (max-width: 600px) {
-        .container {
-          padding: 30px 20px;
-        }
-
-        h1 {
-          font-size: 2rem;
-        }
-
-        .docs-grid {
-          grid-template-columns: 1fr;
-        }
-      }
-    </style>
+    <title>API Desafio Técnico Growth</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   </head>
-  <body>
-    <div class="container">
-      <h1>Growth Technical Challenge</h1>
-      <div class="version">API Version 1.0.0</div>
+  <body class="min-h-screen flex items-center justify-center p-5 bg-gradient-to-br from-[#0a0a0a] to-[#1a1a1a] font-sans">
+    <div class="bg-[#1e1e1e] rounded-[20px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] max-w-[800px] w-full p-12 sm:p-[30px_20px] animate-[fadeIn_0.6s_ease-out] border border-gray-800">
+      <h1 class="text-gray-100 text-4xl sm:text-[2rem] mb-2.5 text-center font-normal">Desafio Técnico Growth</h1>
+      <div class="text-center text-gray-400 text-sm mb-[30px]">Versão da API 1.0.0</div>
 
-      <div class="intro">
-        <div class="intro-title">Welcome to the API</div>
+      <div class="text-gray-300 leading-[1.8] mb-10 text-center">
+        <div class="text-xl text-[#8b5cf6] font-semibold mb-[15px]">Bem-vindo à API</div>
         <p>
-          This RESTful API provides comprehensive employee and department
-          management capabilities with hierarchical structures, manager
-          relationships, and advanced filtering options.
+          Esta API RESTful oferece recursos abrangentes de gerenciamento de 
+          funcionários e departamentos com estruturas hierárquicas, relacionamentos 
+          de gerentes e opções avançadas de filtragem.
         </p>
       </div>
 
-      <div class="features">
-        <div class="features-title">Key Features</div>
-        <ul class="features-list">
-          <li>Employee Management (CRUD)</li>
-          <li>Department Hierarchy</li>
-          <li>Manager Relationships</li>
-          <li>Advanced Filtering</li>
-          <li>Pagination Support</li>
-          <li>Circular Reference Handling</li>
-          <li>Redis Caching</li>
-          <li>Soft Delete Support</li>
-        </ul>
-      </div>
-
-      <div class="docs-section">
-        <div class="docs-title">📚 API Documentation</div>
-        <div class="docs-grid">
-          <a href="/docs/redoc" class="doc-card">
-            <div class="doc-card-title">ReDoc</div>
-            <div class="doc-card-desc">Interactive & Clean</div>
+      <div class="mt-10">
+        <div class="text-gray-100 text-2xl mb-5 text-center">📚 Documentação da API</div>
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] sm:grid-cols-2 gap-[15px]">
+          <a href="/docs/redoc" class="bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-xl p-5 text-center transition-all duration-300 cursor-pointer no-underline hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(139,92,246,0.4)] border border-purple-700">
+            <div class="text-white text-xl font-semibold mb-2">ReDoc</div>
+            <div class="text-white/90 text-[0.85rem]">Interativo & Limpo</div>
           </a>
-          <a href="/docs/swagger" class="doc-card">
-            <div class="doc-card-title">Swagger UI</div>
-            <div class="doc-card-desc">Test Endpoints</div>
+          <a href="/docs/swagger" class="bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-xl p-5 text-center transition-all duration-300 cursor-pointer no-underline hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(139,92,246,0.4)] border border-purple-700">
+            <div class="text-white text-xl font-semibold mb-2">Swagger UI</div>
+            <div class="text-white/90 text-[0.85rem]">Testar Endpoints</div>
           </a>
-          <a href="/docs/scalar" class="doc-card">
-            <div class="doc-card-title">Scalar</div>
-            <div class="doc-card-desc">Modern Interface</div>
+          <a href="/docs/openapi.yaml" class="bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-xl p-5 text-center transition-all duration-300 cursor-pointer no-underline hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(139,92,246,0.4)] border border-purple-700">
+            <div class="text-white text-xl font-semibold mb-2">OpenAPI</div>
+            <div class="text-white/90 text-[0.85rem]">Especificação Raw</div>
           </a>
-          <a href="/docs/openapi.yaml" class="doc-card">
-            <div class="doc-card-title">OpenAPI</div>
-            <div class="doc-card-desc">Raw Specification</div>
+          <a href="/docs/scalar" class="bg-gradient-to-br from-[#7c3aed] to-[#6d28d9] rounded-xl p-5 text-center transition-all duration-300 cursor-pointer no-underline hover:-translate-y-1 hover:shadow-[0_10px_30px_rgba(139,92,246,0.4)] border border-purple-700">
+            <div class="text-white text-xl font-semibold mb-2">Scalar</div>
+            <div class="text-white/90 text-[0.85rem]">Interface Moderna</div>
           </a>
         </div>
       </div>
 
-      <div class="footer">Built with Go, Gin, GORM, PostgreSQL & Redis</div>
+      <div class="mt-[30px] text-center text-gray-500 text-[0.85rem]">Construído com Go, Gin, GORM, PostgreSQL & Redis</div>
     </div>
   </body>
 </html>
