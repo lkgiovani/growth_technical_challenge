@@ -40,17 +40,45 @@ model Departamento {
   updated_at?: utcDateTime;
 }
 
-@doc("Requisição para criar departamento")
-model DepartamentoCreateRequest {
-  @doc("Nome do departamento")
+@doc("Dados mínimos para criar um colaborador como gerente")
+model ColaboradorForGerente {
+  @doc("Nome do colaborador")
+  @example("João Silva")
   nome: string;
 
-  @doc("Referência ao ID do gerente")
+  @doc("CPF brasileiro (11 dígitos)")
+  @pattern("^[0-9]{11}$")
+  @example("12345678901")
+  cpf: string;
+
+  @doc("RG brasileiro (opcional)")
+  @minLength(1)
+  @maxLength(20)
+  @example("123456789")
+  rg?: string;
+}
+
+@doc("""
+Requisição para criar departamento.
+
+**REGRA OBRIGATÓRIA:** Forneça exatamente UM dos dois campos (gerente_id OU gerente).
+""")
+model DepartamentoCreateRequest {
+  @doc("Nome do departamento")
+  @example("Tecnologia")
+  nome: string;
+
+  @doc("ID do gerente existente - Use APENAS esta opção OU 'gerente', nunca ambos")
   @format("uuid")
-  gerente_id: string;
+  @example("22222222-2222-2222-2222-222222222222")
+  gerente_id?: string;
+
+  @doc("Dados do novo gerente - Use APENAS esta opção OU 'gerente_id', nunca ambos")
+  gerente?: ColaboradorForGerente;
 
   @doc("ID do departamento superior (opcional)")
   @format("uuid")
+  @example("11111111-1111-1111-1111-111111111111")
   departamento_superior_id?: string;
 }
 

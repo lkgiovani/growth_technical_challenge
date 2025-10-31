@@ -10,6 +10,7 @@ type UseCase interface {
 	GetDepartamentoByID(id uuid.UUID) (*entities.Departamento, error)
 	GetDepartamentoWithHierarchy(id uuid.UUID) (*entities.Departamento, error)
 	CreateDepartamento(departamento *entities.Departamento) error
+	CreateDepartamentoWithGerente(departamento *entities.Departamento, gerente *entities.Colaborador) error
 	UpdateDepartamento(id uuid.UUID, departamento *entities.Departamento) error
 	DeleteDepartamento(id uuid.UUID) error
 	ListDepartamentos(filters map[string]interface{}, limit, offset int) ([]entities.Departamento, int64, error)

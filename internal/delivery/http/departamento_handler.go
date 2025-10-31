@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	app "github.com/lkgiovani/growth_technical_challenge"
+	"github.com/lkgiovani/growth_technical_challenge/internal/delivery/http/dto"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/departamento"
 )
@@ -24,8 +25,8 @@ func (h *DepartamentoHandler) GetDepartamento(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "ID de departamento inválido",
-			Message: "ID deve ser um UUID válido",
+			Error:   "Invalid department ID",
+			Message: "ID must be a valid UUID",
 		})
 		return
 	}
@@ -33,7 +34,7 @@ func (h *DepartamentoHandler) GetDepartamento(c *gin.Context) {
 	departamento, err := h.departamentoUseCase.GetDepartamentoWithHierarchy(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "Departamento não encontrado",
+			Error:   "Department not found",
 			Message: err.Error(),
 		})
 		return
@@ -45,17 +46,77 @@ func (h *DepartamentoHandler) GetDepartamento(c *gin.Context) {
 }
 
 func (h *DepartamentoHandler) CreateDepartamento(c *gin.Context) {
-	var departamento entities.Departamento
+	var req dto.CreateDepartamentoRequest
 
-	if err := c.ShouldBindJSON(&departamento); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Corpo da requisição inválido",
+			Error:   "Invalid request body",
 			Message: err.Error(),
 		})
 		return
 	}
 
-	if err := h.departamentoUseCase.CreateDepartamento(&departamento); err != nil {
+	if req.GerenteID != nil && req.Gerente != nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "Invalid request body",
+			Message: "Provide gerente_id OR gerente, not both",
+		})
+		return
+	}
+
+	if req.GerenteID == nil && req.Gerente == nil {
+		c.JSON(http.StatusBadRequest, ErrorResponse{
+			Error:   "Invalid request body",
+			Message: "Provide gerente_id or gerente",
+		})
+		return
+	}
+
+	if req.Gerente != nil {
+		departamento := &entities.Departamento{
+			Nome:                   req.Nome,
+			DepartamentoSuperiorID: req.DepartamentoSuperiorID,
+		}
+
+		colaborador := &entities.Colaborador{
+			Nome: req.Gerente.Nome,
+			CPF:  req.Gerente.CPF,
+			RG:   req.Gerente.RG,
+		}
+
+		if err := h.departamentoUseCase.CreateDepartamentoWithGerente(departamento, colaborador); err != nil {
+			statusCode := http.StatusUnprocessableEntity
+			switch app.ErrorCode(err) {
+			case app.ENOTFOUND:
+				statusCode = http.StatusNotFound
+			case app.ECONFLICT:
+				statusCode = http.StatusConflict
+			case app.EINVALID:
+				statusCode = http.StatusBadRequest
+			case app.EDUPLICATION:
+				statusCode = http.StatusConflict
+			}
+			c.JSON(statusCode, ErrorResponse{
+				Error:   "Failed to create department with manager",
+				Message: app.ErrorMessage(err),
+			})
+			return
+		}
+
+		c.JSON(http.StatusCreated, SuccessResponse{
+			Message: "Department and manager created successfully",
+			Data:    departamento,
+		})
+		return
+	}
+
+	departamento := &entities.Departamento{
+		Nome:                   req.Nome,
+		GerenteID:              *req.GerenteID,
+		DepartamentoSuperiorID: req.DepartamentoSuperiorID,
+	}
+
+	if err := h.departamentoUseCase.CreateDepartamento(departamento); err != nil {
 		statusCode := http.StatusUnprocessableEntity
 		switch app.ErrorCode(err) {
 		case app.ENOTFOUND:
@@ -66,14 +127,14 @@ func (h *DepartamentoHandler) CreateDepartamento(c *gin.Context) {
 			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
-			Error:   "Falha ao criar departamento",
+			Error:   "Failed to create department",
 			Message: app.ErrorMessage(err),
 		})
 		return
 	}
 
 	c.JSON(http.StatusCreated, SuccessResponse{
-		Message: "Departamento criado com sucesso",
+		Message: "Department created successfully",
 		Data:    departamento,
 	})
 }
@@ -82,22 +143,38 @@ func (h *DepartamentoHandler) UpdateDepartamento(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "ID de departamento inválido",
-			Message: "ID deve ser um UUID válido",
+			Error:   "Invalid department ID",
+			Message: "ID must be a valid UUID",
 		})
 		return
 	}
 
-	var departamento entities.Departamento
-	if err := c.ShouldBindJSON(&departamento); err != nil {
+	var req dto.UpdateDepartamentoRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Corpo da requisição inválido",
+			Error:   "Invalid request body",
 			Message: err.Error(),
 		})
 		return
 	}
 
-	if err := h.departamentoUseCase.UpdateDepartamento(id, &departamento); err != nil {
+	departamento := &entities.Departamento{
+		ID: id,
+	}
+
+	if req.Nome != nil {
+		departamento.Nome = *req.Nome
+	}
+
+	if req.GerenteID != nil {
+		departamento.GerenteID = *req.GerenteID
+	}
+
+	if req.DepartamentoSuperiorID != nil {
+		departamento.DepartamentoSuperiorID = req.DepartamentoSuperiorID
+	}
+
+	if err := h.departamentoUseCase.UpdateDepartamento(id, departamento); err != nil {
 		statusCode := http.StatusUnprocessableEntity
 		switch app.ErrorCode(err) {
 		case app.ENOTFOUND:
@@ -108,7 +185,7 @@ func (h *DepartamentoHandler) UpdateDepartamento(c *gin.Context) {
 			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
-			Error:   "Falha ao atualizar departamento",
+			Error:   "Failed to update department",
 			Message: app.ErrorMessage(err),
 		})
 		return
@@ -117,7 +194,7 @@ func (h *DepartamentoHandler) UpdateDepartamento(c *gin.Context) {
 	updatedDepartamento, _ := h.departamentoUseCase.GetDepartamentoByID(id)
 
 	c.JSON(http.StatusOK, SuccessResponse{
-		Message: "Departamento atualizado com sucesso",
+		Message: "Department updated successfully",
 		Data:    updatedDepartamento,
 	})
 }
@@ -126,8 +203,8 @@ func (h *DepartamentoHandler) DeleteDepartamento(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "ID de departamento inválido",
-			Message: "ID deve ser um UUID válido",
+			Error:   "Invalid department ID",
+			Message: "ID must be a valid UUID",
 		})
 		return
 	}
@@ -141,14 +218,14 @@ func (h *DepartamentoHandler) DeleteDepartamento(c *gin.Context) {
 			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
-			Error:   "Falha ao remover departamento",
+			Error:   "Failed to delete department",
 			Message: app.ErrorMessage(err),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, SuccessResponse{
-		Message: "Departamento removido com sucesso",
+		Message: "Department deleted successfully",
 	})
 }
 
@@ -156,7 +233,7 @@ func (h *DepartamentoHandler) ListDepartamentos(c *gin.Context) {
 	var req ListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Corpo da requisição inválido",
+			Error:   "Invalid request body",
 			Message: err.Error(),
 		})
 		return
@@ -174,7 +251,7 @@ func (h *DepartamentoHandler) ListDepartamentos(c *gin.Context) {
 	departamentos, total, err := h.departamentoUseCase.ListDepartamentos(req.Filters, req.Limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "Falha ao listar departamentos",
+			Error:   "Failed to list departments",
 			Message: err.Error(),
 		})
 		return

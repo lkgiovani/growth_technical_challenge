@@ -55,7 +55,7 @@ func (r *colaboradorRepository) FindByID(id uuid.UUID) (*entities.Colaborador, e
 	result := r.db.Preload("Departamento.Gerente").First(&colaborador, "id = ?", id)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return nil, app.Errorf(app.ENOTFOUND, "colaborador não encontrado")
+			return nil, app.Errorf(app.ENOTFOUND, "employee not found")
 		}
 		return nil, result.Error
 	}
@@ -213,7 +213,7 @@ func (r *colaboradorRepository) Create(colaborador *entities.Colaborador) error 
 }
 
 func (r *colaboradorRepository) Update(colaborador *entities.Colaborador) error {
-	err := r.db.Save(colaborador).Error
+	err := r.db.Model(colaborador).Updates(colaborador).Error
 	if err != nil {
 		return err
 	}
@@ -239,7 +239,7 @@ func (r *colaboradorRepository) Delete(id uuid.UUID) error {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return app.Errorf(app.ENOTFOUND, "colaborador não encontrado")
+		return app.Errorf(app.ENOTFOUND, "employee not found")
 	}
 
 	if r.cache != nil {

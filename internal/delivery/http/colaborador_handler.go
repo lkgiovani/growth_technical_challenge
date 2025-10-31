@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	app "github.com/lkgiovani/growth_technical_challenge"
+	"github.com/lkgiovani/growth_technical_challenge/internal/delivery/http/dto"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/colaborador"
 )
@@ -20,26 +21,12 @@ func NewColaboradorHandler(colaboradorUseCase colaborador.UseCase) *ColaboradorH
 	}
 }
 
-type ListRequest struct {
-	Filters map[string]interface{} `json:"filters"`
-	Page    int                    `json:"page"`
-	Limit   int                    `json:"limit"`
-}
-
-type PaginatedResponse struct {
-	Data       interface{} `json:"data"`
-	Total      int64       `json:"total"`
-	Page       int         `json:"page"`
-	Limit      int         `json:"limit"`
-	TotalPages int         `json:"total_pages"`
-}
-
 func (h *ColaboradorHandler) GetColaborador(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "ID de colaborador inválido",
-			Message: "ID deve ser um UUID válido",
+			Error:   "Invalid employee ID",
+			Message: "ID must be a valid UUID",
 		})
 		return
 	}
@@ -47,7 +34,7 @@ func (h *ColaboradorHandler) GetColaborador(c *gin.Context) {
 	colaborador, err := h.colaboradorUseCase.GetColaboradorByID(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, ErrorResponse{
-			Error:   "Colaborador não encontrado",
+			Error:   "Employee not found",
 			Message: err.Error(),
 		})
 		return
@@ -59,17 +46,24 @@ func (h *ColaboradorHandler) GetColaborador(c *gin.Context) {
 }
 
 func (h *ColaboradorHandler) CreateColaborador(c *gin.Context) {
-	var colaborador entities.Colaborador
+	var req dto.CreateColaboradorRequest
 
-	if err := c.ShouldBindJSON(&colaborador); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Corpo da requisição inválido",
+			Error:   "Invalid request body",
 			Message: err.Error(),
 		})
 		return
 	}
 
-	if err := h.colaboradorUseCase.CreateColaborador(&colaborador); err != nil {
+	colaborador := &entities.Colaborador{
+		Nome:           req.Nome,
+		CPF:            req.CPF,
+		RG:             req.RG,
+		DepartamentoID: req.DepartamentoID,
+	}
+
+	if err := h.colaboradorUseCase.CreateColaborador(colaborador); err != nil {
 		statusCode := http.StatusUnprocessableEntity
 		switch app.ErrorCode(err) {
 		case app.EDUPLICATION:
@@ -80,14 +74,14 @@ func (h *ColaboradorHandler) CreateColaborador(c *gin.Context) {
 			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
-			Error:   "Falha ao criar colaborador",
+			Error:   "Failed to create employee",
 			Message: app.ErrorMessage(err),
 		})
 		return
 	}
 
 	c.JSON(http.StatusCreated, SuccessResponse{
-		Message: "Colaborador criado com sucesso",
+		Message: "Employee created successfully",
 		Data:    colaborador,
 	})
 }
@@ -96,22 +90,42 @@ func (h *ColaboradorHandler) UpdateColaborador(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "ID de colaborador inválido",
-			Message: "ID deve ser um UUID válido",
+			Error:   "Invalid employee ID",
+			Message: "ID must be a valid UUID",
 		})
 		return
 	}
 
-	var colaborador entities.Colaborador
-	if err := c.ShouldBindJSON(&colaborador); err != nil {
+	var req dto.UpdateColaboradorRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Corpo da requisição inválido",
+			Error:   "Invalid request body",
 			Message: err.Error(),
 		})
 		return
 	}
 
-	if err := h.colaboradorUseCase.UpdateColaborador(id, &colaborador); err != nil {
+	colaborador := &entities.Colaborador{
+		ID: id,
+	}
+
+	if req.Nome != nil {
+		colaborador.Nome = *req.Nome
+	}
+
+	if req.CPF != nil {
+		colaborador.CPF = *req.CPF
+	}
+
+	if req.RG != nil {
+		colaborador.RG = req.RG
+	}
+
+	if req.DepartamentoID != nil {
+		colaborador.DepartamentoID = *req.DepartamentoID
+	}
+
+	if err := h.colaboradorUseCase.UpdateColaborador(id, colaborador); err != nil {
 		statusCode := http.StatusUnprocessableEntity
 		switch app.ErrorCode(err) {
 		case app.ENOTFOUND:
@@ -122,7 +136,7 @@ func (h *ColaboradorHandler) UpdateColaborador(c *gin.Context) {
 			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
-			Error:   "Falha ao atualizar colaborador",
+			Error:   "Failed to update employee",
 			Message: app.ErrorMessage(err),
 		})
 		return
@@ -131,7 +145,7 @@ func (h *ColaboradorHandler) UpdateColaborador(c *gin.Context) {
 	updatedColaborador, _ := h.colaboradorUseCase.GetColaboradorByID(id)
 
 	c.JSON(http.StatusOK, SuccessResponse{
-		Message: "Colaborador atualizado com sucesso",
+		Message: "Employee updated successfully",
 		Data:    updatedColaborador,
 	})
 }
@@ -140,8 +154,8 @@ func (h *ColaboradorHandler) DeleteColaborador(c *gin.Context) {
 	id, err := uuid.Parse(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "ID de colaborador inválido",
-			Message: "ID deve ser um UUID válido",
+			Error:   "Invalid employee ID",
+			Message: "ID must be a valid UUID",
 		})
 		return
 	}
@@ -155,14 +169,14 @@ func (h *ColaboradorHandler) DeleteColaborador(c *gin.Context) {
 			statusCode = http.StatusBadRequest
 		}
 		c.JSON(statusCode, ErrorResponse{
-			Error:   "Falha ao remover colaborador",
+			Error:   "Failed to delete employee",
 			Message: app.ErrorMessage(err),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, SuccessResponse{
-		Message: "Colaborador removido com sucesso",
+		Message: "Employee deleted successfully",
 	})
 }
 
@@ -170,7 +184,7 @@ func (h *ColaboradorHandler) ListColaboradores(c *gin.Context) {
 	var req ListRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, ErrorResponse{
-			Error:   "Corpo da requisição inválido",
+			Error:   "Invalid request body",
 			Message: err.Error(),
 		})
 		return
@@ -188,7 +202,7 @@ func (h *ColaboradorHandler) ListColaboradores(c *gin.Context) {
 	colaboradores, total, err := h.colaboradorUseCase.ListColaboradores(req.Filters, req.Limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, ErrorResponse{
-			Error:   "Falha ao listar colaboradores",
+			Error:   "Failed to list employees",
 			Message: err.Error(),
 		})
 		return

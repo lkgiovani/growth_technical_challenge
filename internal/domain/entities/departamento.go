@@ -23,7 +23,7 @@ type Departamento struct {
 
 func (d *Departamento) BeforeCreate(tx *gorm.DB) error {
 	if d.ID == uuid.Nil {
-		d.ID = uuid.New()
+		d.ID = uuid.Must(uuid.NewV7())
 	}
 	return nil
 }

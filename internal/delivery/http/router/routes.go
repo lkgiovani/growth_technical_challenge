@@ -7,10 +7,6 @@ import (
 	httpDelivery "github.com/lkgiovani/growth_technical_challenge/internal/delivery/http"
 )
 
-/*
-
- */
-
 func SetupRoutes(
 	r *gin.Engine,
 	colaboradorHandler *httpDelivery.ColaboradorHandler,
@@ -19,18 +15,9 @@ func SetupRoutes(
 	docsHandler *httpDelivery.DocsHandler,
 ) {
 	r.LoadHTMLGlob("docs/schema/*.html")
-	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "API - Desafio Técnico Growth",
-			"version": "1.0.0",
-			"documentacao": gin.H{
-				"redoc":   "/docs/redoc",
-				"swagger": "/docs/swagger",
-				"scalar":  "/docs/scalar",
-				"openapi": "/docs/openapi.yaml",
-			},
-		})
-	})
+
+	r.GET("/favicon.ico", httpDelivery.ServeFavicon)
+	r.GET("/", httpDelivery.ServeIndex)
 
 	docs := r.Group("/docs")
 	{
@@ -45,8 +32,8 @@ func SetupRoutes(
 	{
 		api.GET("/health", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
-				"status":         "ok",
-				"banco_de_dados": "conectado",
+				"status":   "ok",
+				"database": "connected",
 			})
 		})
 
