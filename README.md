@@ -142,6 +142,12 @@ Após iniciar a aplicação com `docker-compose up -d`, acesse no seu navegador:
 
 ## 🧪 Exemplos de Requests
 
+> **💡 Nota Importante**:
+>
+> - Para **Departamentos**: Você pode fornecer `gerente_id` (gerente existente) OU `gerente` (criar novo gerente)
+> - Para **Colaboradores**: Você pode fornecer `departamento_id` (departamento existente) OU `departamento` (criar novo departamento)
+> - **Nunca envie ambos os campos ao mesmo tempo!**
+
 ### Via cURL
 
 #### 1. Health Check
@@ -152,6 +158,8 @@ curl http://localhost:8080/health
 
 #### 2. Criar Departamento
 
+##### Opção 1: Com gerente existente
+
 ```bash
 curl -X POST http://localhost:8080/api/v1/departamentos \
   -H "Content-Type: application/json" \
@@ -161,7 +169,25 @@ curl -X POST http://localhost:8080/api/v1/departamentos \
   }'
 ```
 
+##### Opção 2: Criando gerente junto com o departamento
+
+```bash
+curl -X POST http://localhost:8080/api/v1/departamentos \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Recursos Humanos",
+    "gerente": {
+      "nome": "Maria Santos",
+      "cpf": "85165167097",
+      "rg": "987654321"
+    },
+    "departamento_superior_id": "01234567-89ab-7def-0123-456789abcdef"
+  }'
+```
+
 #### 3. Criar Colaborador
+
+##### Opção 1: Com departamento existente
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/colaboradores \
@@ -171,6 +197,23 @@ curl -X POST http://localhost:8080/api/v1/colaboradores \
     "cpf": "12345678901",
     "rg": "123456789",
     "departamento_id": "01234567-89ab-7def-0123-456789abcdef"
+  }'
+```
+
+##### Opção 2: Criando departamento junto com o colaborador
+
+```bash
+curl -X POST http://localhost:8080/api/v1/colaboradores \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Carlos Souza",
+    "cpf": "98765432101",
+    "rg": "111222333",
+    "departamento": {
+      "nome": "Vendas",
+      "gerente_id": "01234567-89ab-7def-0123-456789abcdef",
+      "departamento_superior_id": "22222222-2222-2222-2222-222222222222"
+    }
   }'
 ```
 

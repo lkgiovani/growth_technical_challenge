@@ -11,7 +11,53 @@ namespace GrowthAPI;
 @tag("Colaboradores")
 @route("/colaboradores")
 interface ColaboradorOperations {
-  @doc("Criar um novo colaborador com validação de CPF e RG")
+  @doc("""
+  Criar um novo colaborador com validação de CPF e RG.
+  
+  **REGRA IMPORTANTE:** Você DEVE fornecer exatamente UM dos dois campos: departamento_id OU departamento.
+  
+  **Validações:**
+  - Valida CPF e RG únicos
+  - Verifica existência do departamento quando usar departamento_id
+  - Valida gerente do novo departamento quando criar departamento junto
+  - Verifica existência do departamento superior se fornecido
+  """)
+  @opExample(
+    #{
+      parameters: #{
+        colaborador: #{
+          nome: "João Silva",
+          cpf: "12345678901",
+          rg: "123456789",
+          departamento_id: "22222222-2222-2222-2222-222222222222"
+        }
+      }
+    },
+    #{
+      title: "Opção 1 - Com departamento existente",
+      description: "Use quando você já tem um departamento cadastrado"
+    }
+  )
+  @opExample(
+    #{
+      parameters: #{
+        colaborador: #{
+          nome: "João Silva",
+          cpf: "12345678901",
+          rg: "123456789",
+          departamento: #{
+            nome: "Vendas",
+            gerente_id: "33333333-3333-3333-3333-333333333333",
+            departamento_superior_id: "11111111-1111-1111-1111-111111111111"
+          }
+        }
+      }
+    },
+    #{
+      title: "Opção 2 - Criando departamento junto",
+      description: "Use quando você quer criar o departamento e o colaborador ao mesmo tempo"
+    }
+  )
   @post
   @summary("Criar colaborador")
   createColaborador(@body colaborador: ColaboradorCreateRequest): {

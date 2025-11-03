@@ -38,9 +38,31 @@ model Colaborador {
   updated_at?: utcDateTime;
 }
 
-@doc("Requisição para criar colaborador")
+@doc("Dados mínimos para criar um departamento para o colaborador")
+model DepartamentoForColaborador {
+  @doc("Nome do departamento")
+  @example("Tecnologia")
+  nome: string;
+
+  @doc("ID do gerente do departamento")
+  @format("uuid")
+  @example("22222222-2222-2222-2222-222222222222")
+  gerente_id: string;
+
+  @doc("ID do departamento superior (opcional)")
+  @format("uuid")
+  @example("11111111-1111-1111-1111-111111111111")
+  departamento_superior_id?: string;
+}
+
+@doc("""
+Requisição para criar colaborador.
+
+**REGRA OBRIGATÓRIA:** Forneça exatamente UM dos dois campos (departamento_id OU departamento).
+""")
 model ColaboradorCreateRequest {
   @doc("Nome do colaborador")
+  @example("João Silva")
   nome: string;
 
   @doc("CPF brasileiro (11 dígitos)")
@@ -51,11 +73,16 @@ model ColaboradorCreateRequest {
   @doc("RG brasileiro (opcional)")
   @minLength(1)
   @maxLength(20)
+  @example("123456789")
   rg?: string;
 
-  @doc("Referência ao ID do departamento")
+  @doc("ID do departamento existente - Use APENAS esta opção OU 'departamento', nunca ambos")
   @format("uuid")
-  departamento_id: string;
+  @example("22222222-2222-2222-2222-222222222222")
+  departamento_id?: string;
+
+  @doc("Dados do novo departamento - Use APENAS esta opção OU 'departamento_id', nunca ambos")
+  departamento?: DepartamentoForColaborador;
 }
 
 @doc("Requisição para atualizar colaborador")
