@@ -1,143 +1,94 @@
 # API Documentation with TypeSpec
 
-This directory contains the TypeSpec specification for the Growth Technical Challenge API.
+Este diretório contém a especificação TypeSpec da API que gera a documentação OpenAPI 3.1.
 
-## What is TypeSpec?
+## O que é TypeSpec?
 
-TypeSpec is a language for describing cloud service APIs and generating other API description languages, client and service code, documentation, and other assets. TypeSpec provides highly extensible core language primitives that can describe API shapes common among REST, GraphQL, gRPC, and other protocols.
+TypeSpec é uma linguagem para descrever APIs e gerar especificações OpenAPI, código de cliente, documentação e outros assets.
 
-## Prerequisites
+## 🚀 Como Rodar
 
-- Node.js 18+ and npm
-
-## Installation
-
-Install dependencies:
+### 1. Instalar dependências
 
 ```bash
+cd docs
 npm install
 ```
 
-## Usage
-
-### Compile TypeSpec to OpenAPI
-
-Generate OpenAPI 3.0 specification:
+### 2. Compilar TypeSpec para OpenAPI
 
 ```bash
 npm run compile
 ```
 
-This will generate the OpenAPI specification in the `tsp-output/` directory.
+Isso irá gerar a especificação OpenAPI no diretório `tsp-output/@typespec/openapi3/openapi.yaml`.
 
-### Watch Mode
+### 3. Copiar para a aplicação
 
-To automatically recompile when files change:
+O arquivo gerado precisa ser copiado para onde a aplicação Go pode lê-lo:
+
+```bash
+cp tsp-output/@typespec/openapi3/openapi.yaml ../internal/delivery/http/resources/openapi.yaml
+```
+
+### 4. Reiniciar a aplicação
+
+```bash
+cd ..
+docker-compose restart app
+```
+
+### 5. Acessar a documentação
+
+Abra no navegador:
+
+- http://localhost:8080/
+- http://localhost:8080/docs/swagger
+- http://localhost:8080/docs/redoc
+- http://localhost:8080/docs/scalar
+
+## 🔄 Modo Watch (Desenvolvimento)
+
+Para recompilar automaticamente quando os arquivos mudarem:
 
 ```bash
 npm run watch
 ```
 
-### Format TypeSpec Files
-
-Format all TypeSpec files:
-
-```bash
-npm run format
-```
-
-## Project Structure
+## 📁 Estrutura do Projeto
 
 ```
 docs/
-├── main.tsp           # Main TypeSpec entry point with service configuration
-├── models.tsp         # Data models and DTOs
-├── operations.tsp     # API operations and endpoints
-├── package.json       # Node.js dependencies
-├── tspconfig.yaml     # TypeSpec compiler configuration
-└── tsp-output/        # Generated OpenAPI specification (gitignored)
+├── src/
+│   ├── main.tsp                    # Entry point principal
+│   └── resource/
+│       ├── colaboradores/
+│       │   ├── models.tsp          # Modelos de colaboradores
+│       │   └── routes.tsp          # Rotas de colaboradores
+│       └── departamentos/
+│           ├── models.tsp          # Modelos de departamentos
+│           └── routes.tsp          # Rotas de departamentos
+├── tspconfig.yaml                  # Configuração do compilador
+├── package.json                    # Dependências Node.js
+└── tsp-output/                     # OpenAPI gerado (gitignored)
 ```
 
-## TypeSpec Files
+## 📝 Editar a Documentação
 
-### main.tsp
+1. Edite os arquivos `.tsp` em `src/resource/`
+2. Execute `npm run compile` para regenerar o OpenAPI
+3. Copie o arquivo gerado para `../internal/delivery/http/resources/openapi.yaml`
+4. Reinicie a aplicação
 
-Contains the service metadata and common models:
+## ✨ Benefícios do TypeSpec
 
-- Service information (title, version, description)
-- Server configuration
-- Common response models (ErrorResponse, SuccessResponse)
-- Generic list request/response models
+- ✅ Type Safety: Detecta erros em tempo de compilação
+- ✅ Reutilização: Compartilhe modelos entre operações
+- ✅ Manutenibilidade: Fonte única da verdade para contratos da API
+- ✅ Consistência: Força padrões consistentes na API
+- ✅ Geração de código: Pode gerar SDKs de cliente automaticamente
 
-### models.tsp
+## 📖 Referência
 
-Defines all data models:
-
-- User (model, create, update requests)
-- Employee (model, create, update requests, filters)
-- Department (model, create, update requests, filters)
-- Response models with additional information
-
-### operations.tsp
-
-Defines all API operations organized by resource:
-
-- Health Check operations
-- User CRUD operations
-- Employee CRUD operations with validation
-- Department CRUD operations with hierarchy
-- Manager operations
-
-## Features
-
-- ✅ Complete OpenAPI 3.0 specification generation
-- ✅ Strongly typed models and operations
-- ✅ Detailed documentation with @doc decorators
-- ✅ Request/response validation with patterns and constraints
-- ✅ HTTP status codes for all responses
-- ✅ Organized by domain (Users, Employees, Departments, Managers)
-- ✅ Support for complex scenarios (hierarchy, filtering, pagination)
-
-## Benefits over Manual Swagger
-
-1. **Type Safety**: TypeSpec catches errors at compile time
-2. **Reusability**: Share models across operations with spreads (...)
-3. **Maintainability**: Single source of truth for API contracts
-4. **Consistency**: Enforces consistent API patterns
-5. **Extensibility**: Easy to add new operations and models
-6. **Code Generation**: Can generate client SDKs, mock servers, and more
-
-## Output
-
-The generated OpenAPI specification can be:
-
-- Imported into Swagger UI
-- Used to generate client libraries
-- Validated against your API implementation
-- Shared with API consumers
-
-## Quick Start
-
-```bash
-npm install
-npm run compile
-```
-
-Then start your Go API and visit:
-
-- http://localhost:8080/docs/redoc
-- http://localhost:8080/docs/swagger
-- http://localhost:8080/docs/scalar
-
-## Development Guide
-
-For detailed information about TypeSpec development, see [TYPESPEC_GUIDE.md](TYPESPEC_GUIDE.md).
-
-## Next Steps
-
-After generating the OpenAPI spec:
-
-1. Start the Go API server
-2. Visit any of the documentation viewers
-3. Test API endpoints interactively
-4. Generate client SDKs if needed
+- [TypeSpec Documentation](https://typespec.io/)
+- [OpenAPI Specification](https://www.openapis.org/)
