@@ -7,21 +7,27 @@ import (
 	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/repository"
+	"github.com/lkgiovani/growth_technical_challenge/internal/services/cache_service"
 	"github.com/lkgiovani/growth_technical_challenge/pkg/logger"
 	"github.com/lkgiovani/growth_technical_challenge/pkg/utils"
 	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type usecase struct {
 	colaboradorRepo  repository.ColaboradorRepository
 	departamentoRepo repository.DepartamentoRepository
+	cacheService     cache_service.CacheService
+	db               *gorm.DB
 	logger           logger.Logger
 }
 
-func NewUseCase(colaboradorRepo repository.ColaboradorRepository, departamentoRepo repository.DepartamentoRepository, log logger.Logger) UseCase {
+func NewUseCase(colaboradorRepo repository.ColaboradorRepository, departamentoRepo repository.DepartamentoRepository, cacheSvc cache_service.CacheService, db *gorm.DB, log logger.Logger) UseCase {
 	return &usecase{
 		colaboradorRepo:  colaboradorRepo,
 		departamentoRepo: departamentoRepo,
+		cacheService:     cacheSvc,
+		db:               db,
 		logger:           log,
 	}
 }
@@ -95,7 +101,133 @@ func (u *usecase) CreateColaborador(colaborador *entities.Colaborador) error {
 	colaborador.Nome = strings.TrimSpace(colaborador.Nome)
 
 	u.logger.Debug("Creating colaborador in repository", zap.String("name", colaborador.Nome), zap.String("cpf", colaborador.CPF))
-	return u.colaboradorRepo.Create(colaborador)
+
+	if err := u.colaboradorRepo.Create(colaborador); err != nil {
+		return err
+	}
+
+	if u.cacheService != nil {
+		if err := u.cacheService.InvalidateColaboradoresByDepartment(colaborador.DepartamentoID); err != nil {
+			u.logger.Warn("Failed to invalidate colaboradores cache", zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+func (u *usecase) CreateColaboradorWithDepartamento(colaborador *entities.Colaborador, departamento *entities.Departamento) error {
+	if colaborador == nil {
+		u.logger.Warn("Attempt to create null colaborador")
+		return app.Errorf(app.EINVALID, "colaborador cannot be null")
+	}
+
+	if departamento == nil {
+		u.logger.Warn("Attempt to create colaborador with null departamento")
+		return app.Errorf(app.EINVALID, "departamento cannot be null")
+	}
+
+	u.logger.Info("Creating colaborador with new departamento", zap.String("colaboradorName", colaborador.Nome), zap.String("departamentoName", departamento.Nome))
+
+	colaborador.ID = uuid.Nil
+	departamento.ID = uuid.Nil
+
+	colaborador.Nome = strings.TrimSpace(colaborador.Nome)
+	if colaborador.Nome == "" {
+		return app.Errorf(app.EINVALID, "nome é obrigatório")
+	}
+
+	if len(colaborador.Nome) < 3 {
+		return app.Errorf(app.EINVALID, "nome deve ter pelo menos 3 caracteres")
+	}
+
+	if len(colaborador.Nome) > 255 {
+		return app.Errorf(app.EINVALID, "nome não pode exceder 255 caracteres")
+	}
+
+	departamento.Nome = strings.TrimSpace(departamento.Nome)
+	if departamento.Nome == "" {
+		return app.Errorf(app.EINVALID, "nome do departamento é obrigatório")
+	}
+
+	if len(departamento.Nome) < 3 {
+		return app.Errorf(app.EINVALID, "nome do departamento deve ter pelo menos 3 caracteres")
+	}
+
+	if len(departamento.Nome) > 255 {
+		return app.Errorf(app.EINVALID, "nome do departamento não pode exceder 255 caracteres")
+	}
+
+	colaborador.CPF = utils.NormalizeCPF(colaborador.CPF)
+	if !utils.ValidateCPF(colaborador.CPF) {
+		return app.Errorf(app.EINVALID, "CPF inválido")
+	}
+
+	existingColaborador, err := u.colaboradorRepo.FindByCPF(colaborador.CPF)
+	if err != nil {
+		return err
+	}
+	if existingColaborador != nil {
+		return app.Errorf(app.EDUPLICATION, "CPF já existe")
+	}
+
+	if colaborador.RG != nil && *colaborador.RG != "" {
+		normalizedRG := utils.NormalizeRG(*colaborador.RG)
+		colaborador.RG = &normalizedRG
+
+		existingRG, errRG := u.colaboradorRepo.FindByRG(*colaborador.RG)
+		if errRG != nil {
+			return errRG
+		}
+		if existingRG != nil {
+			return app.Errorf(app.EDUPLICATION, "RG já existe")
+		}
+	}
+
+	gerente, err := u.colaboradorRepo.FindByID(departamento.GerenteID)
+	if err != nil {
+		u.logger.Error("Failed to find gerente", zap.Error(err), zap.String("gerenteID", departamento.GerenteID.String()))
+		return err
+	}
+	if gerente == nil {
+		u.logger.Warn("Gerente not found", zap.String("gerenteID", departamento.GerenteID.String()))
+		return app.Errorf(app.ENOTFOUND, "gerente não encontrado")
+	}
+
+	if departamento.DepartamentoSuperiorID != nil && *departamento.DepartamentoSuperiorID != uuid.Nil {
+		parentDept, err := u.departamentoRepo.FindByID(*departamento.DepartamentoSuperiorID)
+		if err != nil {
+			return err
+		}
+		if parentDept == nil {
+			return app.Errorf(app.ENOTFOUND, "departamento superior não encontrado")
+		}
+	}
+
+	return u.db.Transaction(func(tx *gorm.DB) error {
+		txDeptRepo := repository.NewDepartamentoRepository(tx, u.logger)
+		txColabRepo := repository.NewColaboradorRepository(tx, u.logger)
+
+		if err := txDeptRepo.Create(departamento); err != nil {
+			return err
+		}
+
+		colaborador.DepartamentoID = departamento.ID
+
+		if err := txColabRepo.Create(colaborador); err != nil {
+			return err
+		}
+
+		if u.cacheService != nil {
+			if err := u.cacheService.InvalidateColaboradoresByDepartment(departamento.ID); err != nil {
+				u.logger.Warn("Failed to invalidate colaboradores cache", zap.Error(err))
+			}
+			if err := u.cacheService.InvalidateAllDepartmentCache(departamento.ID, departamento.DepartamentoSuperiorID); err != nil {
+				u.logger.Warn("Failed to invalidate department cache", zap.Error(err))
+			}
+		}
+
+		return nil
+	})
 }
 
 func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colaborador) error {
@@ -173,7 +305,26 @@ func (u *usecase) UpdateColaborador(id uuid.UUID, colaborador *entities.Colabora
 		existingColaborador.DepartamentoID = colaborador.DepartamentoID
 	}
 
-	return u.colaboradorRepo.Update(existingColaborador)
+	oldDepartmentID := existingColaborador.DepartamentoID
+	newDepartmentID := colaborador.DepartamentoID
+
+	if err := u.colaboradorRepo.Update(existingColaborador); err != nil {
+		return err
+	}
+
+	if u.cacheService != nil {
+		if err := u.cacheService.InvalidateColaboradoresByDepartment(oldDepartmentID); err != nil {
+			u.logger.Warn("Failed to invalidate old department cache", zap.Error(err))
+		}
+
+		if newDepartmentID != uuid.Nil && newDepartmentID != oldDepartmentID {
+			if err := u.cacheService.InvalidateColaboradoresByDepartment(newDepartmentID); err != nil {
+				u.logger.Warn("Failed to invalidate new department cache", zap.Error(err))
+			}
+		}
+	}
+
+	return nil
 }
 
 func (u *usecase) DeleteColaborador(id uuid.UUID) error {
@@ -184,13 +335,23 @@ func (u *usecase) DeleteColaborador(id uuid.UUID) error {
 
 	u.logger.Debug("Deleting colaborador", zap.String("id", id.String()))
 
-	_, err := u.colaboradorRepo.FindByID(id)
+	colaborador, err := u.colaboradorRepo.FindByID(id)
 	if err != nil {
 		u.logger.Error("Failed to find colaborador for deletion", zap.Error(err), zap.String("id", id.String()))
 		return err
 	}
 
-	return u.colaboradorRepo.Delete(id)
+	if err := u.colaboradorRepo.Delete(id); err != nil {
+		return err
+	}
+
+	if u.cacheService != nil {
+		if err := u.cacheService.InvalidateColaboradoresByDepartment(colaborador.DepartamentoID); err != nil {
+			u.logger.Warn("Failed to invalidate colaboradores cache", zap.Error(err))
+		}
+	}
+
+	return nil
 }
 
 func (u *usecase) ListColaboradores(filters map[string]interface{}, limit, offset int) ([]entities.Colaborador, int64, error) {

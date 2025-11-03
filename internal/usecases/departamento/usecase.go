@@ -7,6 +7,7 @@ import (
 	app "github.com/lkgiovani/growth_technical_challenge"
 	"github.com/lkgiovani/growth_technical_challenge/internal/domain/entities"
 	"github.com/lkgiovani/growth_technical_challenge/internal/repository"
+	"github.com/lkgiovani/growth_technical_challenge/internal/services/cache_service"
 	"github.com/lkgiovani/growth_technical_challenge/pkg/logger"
 	"github.com/lkgiovani/growth_technical_challenge/pkg/utils"
 	"go.uber.org/zap"
@@ -16,14 +17,16 @@ import (
 type usecase struct {
 	departamentoRepo repository.DepartamentoRepository
 	colaboradorRepo  repository.ColaboradorRepository
+	cacheService     cache_service.CacheService
 	db               *gorm.DB
 	logger           logger.Logger
 }
 
-func NewUseCase(departamentoRepo repository.DepartamentoRepository, colaboradorRepo repository.ColaboradorRepository, db *gorm.DB, log logger.Logger) UseCase {
+func NewUseCase(departamentoRepo repository.DepartamentoRepository, colaboradorRepo repository.ColaboradorRepository, cacheSvc cache_service.CacheService, db *gorm.DB, log logger.Logger) UseCase {
 	return &usecase{
 		departamentoRepo: departamentoRepo,
 		colaboradorRepo:  colaboradorRepo,
+		cacheService:     cacheSvc,
 		db:               db,
 		logger:           log,
 	}
@@ -50,7 +53,25 @@ func (u *usecase) GetDepartamentoWithHierarchy(id uuid.UUID) (*entities.Departam
 	if id == uuid.Nil {
 		return nil, app.Errorf(app.EINVALID, "invalid department ID")
 	}
-	return u.departamentoRepo.FindByIDWithHierarchy(id)
+
+	if u.cacheService != nil {
+		if dept, err := u.cacheService.GetDepartmentHierarchy(id); err == nil {
+			return dept, nil
+		}
+	}
+
+	dept, err := u.departamentoRepo.FindByIDWithHierarchy(id)
+	if err != nil {
+		return nil, err
+	}
+
+	if u.cacheService != nil && dept != nil {
+		if err := u.cacheService.SetDepartmentHierarchy(id, dept); err != nil {
+			u.logger.Warn("Failed to cache department hierarchy", zap.Error(err))
+		}
+	}
+
+	return dept, nil
 }
 
 func (u *usecase) CreateDepartamento(departamento *entities.Departamento) error {
@@ -86,7 +107,18 @@ func (u *usecase) CreateDepartamento(departamento *entities.Departamento) error 
 	}
 
 	departamento.Nome = strings.TrimSpace(departamento.Nome)
-	return u.departamentoRepo.Create(departamento)
+
+	if err := u.departamentoRepo.Create(departamento); err != nil {
+		return err
+	}
+
+	if u.cacheService != nil {
+		if err := u.cacheService.InvalidateAllDepartmentCache(departamento.ID, departamento.DepartamentoSuperiorID); err != nil {
+			u.logger.Warn("Failed to invalidate department cache", zap.Error(err))
+		}
+	}
+
+	return nil
 }
 
 func (u *usecase) CreateDepartamentoWithGerente(departamento *entities.Departamento, gerente *entities.Colaborador) error {
@@ -161,8 +193,8 @@ func (u *usecase) CreateDepartamentoWithGerente(departamento *entities.Departame
 	gerente.Nome = strings.TrimSpace(gerente.Nome)
 
 	return u.db.Transaction(func(tx *gorm.DB) error {
-		txColabRepo := repository.NewColaboradorRepository(tx, nil, u.logger)
-		txDeptRepo := repository.NewDepartamentoRepository(tx, nil, u.logger)
+		txColabRepo := repository.NewColaboradorRepository(tx, u.logger)
+		txDeptRepo := repository.NewDepartamentoRepository(tx, u.logger)
 
 		if err := txColabRepo.Create(gerente); err != nil {
 			return err
@@ -178,6 +210,15 @@ func (u *usecase) CreateDepartamentoWithGerente(departamento *entities.Departame
 		gerente.DepartamentoID = departamento.ID
 		if err := txColabRepo.Update(gerente); err != nil {
 			return err
+		}
+
+		if u.cacheService != nil {
+			if err := u.cacheService.InvalidateAllDepartmentCache(departamento.ID, departamento.DepartamentoSuperiorID); err != nil {
+				u.logger.Warn("Failed to invalidate department cache", zap.Error(err))
+			}
+			if err := u.cacheService.InvalidateColaboradoresByDepartment(departamento.ID); err != nil {
+				u.logger.Warn("Failed to invalidate colaboradores cache", zap.Error(err))
+			}
 		}
 
 		return nil
@@ -286,7 +327,26 @@ func (u *usecase) UpdateDepartamento(id uuid.UUID, departamento *entities.Depart
 		}
 	}
 
-	return u.departamentoRepo.Update(existingDept)
+	oldParentID := existingDept.DepartamentoSuperiorID
+	newParentID := departamento.DepartamentoSuperiorID
+
+	if err := u.departamentoRepo.Update(existingDept); err != nil {
+		return err
+	}
+
+	if u.cacheService != nil {
+		if err := u.cacheService.InvalidateAllDepartmentCache(id, oldParentID); err != nil {
+			u.logger.Warn("Failed to invalidate old parent cache", zap.Error(err))
+		}
+
+		if newParentID != nil && (oldParentID == nil || *newParentID != *oldParentID) {
+			if err := u.cacheService.InvalidateAllDepartmentCache(id, newParentID); err != nil {
+				u.logger.Warn("Failed to invalidate new parent cache", zap.Error(err))
+			}
+		}
+	}
+
+	return nil
 }
 
 func (u *usecase) DeleteDepartamento(id uuid.UUID) error {
@@ -325,8 +385,18 @@ func (u *usecase) DeleteDepartamento(id uuid.UUID) error {
 		}
 	}
 
+	if err := u.departamentoRepo.Delete(id); err != nil {
+		return err
+	}
+
+	if u.cacheService != nil {
+		if err := u.cacheService.InvalidateAllDepartmentCache(id, departamento.DepartamentoSuperiorID); err != nil {
+			u.logger.Warn("Failed to invalidate department cache", zap.Error(err))
+		}
+	}
+
 	u.logger.Info("Department deleted successfully", zap.String("id", id.String()))
-	return u.departamentoRepo.Delete(id)
+	return nil
 }
 
 func (u *usecase) ListDepartamentos(filters map[string]interface{}, limit, offset int) ([]entities.Departamento, int64, error) {
@@ -357,15 +427,69 @@ func (u *usecase) GetGerenteColaboradores(gerenteID uuid.UUID) ([]entities.Colab
 		return nil, app.Errorf(app.ENOTFOUND, "gerente não encontrado")
 	}
 
-	departmentIDs, err := u.departamentoRepo.FindAllSubDepartmentIDs(gerente.DepartamentoID)
-	if err != nil {
-		u.logger.Error("Failed to find subdepartment IDs", zap.Error(err), zap.String("departmentID", gerente.DepartamentoID.String()))
-		return nil, err
+	var departmentIDs []uuid.UUID
+
+	if u.cacheService != nil {
+		if ids, err := u.cacheService.GetSubDepartmentIDs(gerente.DepartamentoID); err == nil {
+			departmentIDs = ids
+		}
+	}
+
+	if departmentIDs == nil {
+		ids, err := u.departamentoRepo.FindAllSubDepartmentIDs(gerente.DepartamentoID)
+		if err != nil {
+			u.logger.Error("Failed to find subdepartment IDs", zap.Error(err), zap.String("departmentID", gerente.DepartamentoID.String()))
+			return nil, err
+		}
+		departmentIDs = ids
+
+		if u.cacheService != nil {
+			if err := u.cacheService.SetSubDepartmentIDs(gerente.DepartamentoID, ids); err != nil {
+				u.logger.Warn("Failed to cache subdepartment IDs", zap.Error(err))
+			}
+		}
 	}
 
 	u.logger.Debug("Found department hierarchy", zap.String("managerID", gerenteID.String()), zap.Int("departmentCount", len(departmentIDs)))
 
-	return u.colaboradorRepo.FindByDepartmentIDs(departmentIDs)
+	result := make([]entities.Colaborador, 0)
+	uncachedDeptIDs := make([]uuid.UUID, 0)
+
+	if u.cacheService != nil {
+		for _, deptID := range departmentIDs {
+			if colaboradores, err := u.cacheService.GetColaboradoresByDepartment(deptID); err == nil {
+				result = append(result, colaboradores...)
+			} else {
+				uncachedDeptIDs = append(uncachedDeptIDs, deptID)
+			}
+		}
+	} else {
+		uncachedDeptIDs = departmentIDs
+	}
+
+	if len(uncachedDeptIDs) > 0 {
+		cols, err := u.colaboradorRepo.FindByDepartmentIDs(uncachedDeptIDs)
+		if err != nil {
+			return nil, err
+		}
+
+		if u.cacheService != nil {
+			deptColsMap := make(map[uuid.UUID][]entities.Colaborador)
+			for _, col := range cols {
+				deptColsMap[col.DepartamentoID] = append(deptColsMap[col.DepartamentoID], col)
+			}
+
+			for deptID, deptCols := range deptColsMap {
+				if err := u.cacheService.SetColaboradoresByDepartment(deptID, deptCols); err != nil {
+					u.logger.Warn("Failed to cache colaboradores for department", zap.Error(err))
+				}
+			}
+		}
+
+		result = append(result, cols...)
+	}
+
+	return result, nil
 }
 
 func (u *usecase) validateDepartamento(departamento *entities.Departamento) error {

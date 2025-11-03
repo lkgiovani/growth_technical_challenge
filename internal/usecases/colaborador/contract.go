@@ -9,6 +9,7 @@ type UseCase interface {
 	GetAllColaboradores(limit, offset int) ([]entities.Colaborador, int64, error)
 	GetColaboradorByID(id uuid.UUID) (*entities.Colaborador, error)
 	CreateColaborador(colaborador *entities.Colaborador) error
+	CreateColaboradorWithDepartamento(colaborador *entities.Colaborador, departamento *entities.Departamento) error
 	UpdateColaborador(id uuid.UUID, colaborador *entities.Colaborador) error
 	DeleteColaborador(id uuid.UUID) error
 	ListColaboradores(filters map[string]interface{}, limit, offset int) ([]entities.Colaborador, int64, error)
