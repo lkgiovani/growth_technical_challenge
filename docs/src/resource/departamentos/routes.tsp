@@ -43,7 +43,7 @@ interface DepartamentoOperations {
           nome: "Recursos Humanos",
           gerente: #{
             nome: "Maria Santos",
-            cpf: "98765432109",
+            cpf: "851.651.670-97",
             rg: "987654321"
           }
         }

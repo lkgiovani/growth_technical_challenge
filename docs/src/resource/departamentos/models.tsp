@@ -48,7 +48,7 @@ model ColaboradorForGerente {
 
   @doc("CPF brasileiro (11 dígitos)")
   @pattern("^[0-9]{11}$")
-  @example("12345678901")
+  @example("851.651.670-97")
   cpf: string;
 
   @doc("RG brasileiro (opcional)")
