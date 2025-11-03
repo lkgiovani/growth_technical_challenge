@@ -53,13 +53,53 @@ func (h *ColaboradorHandler) CreateColaborador(c *gin.Context) {
 		return
 	}
 
-	h.logger.Info("Creating colaborador", zap.String("name", req.Nome), zap.String("cpf", req.CPF))
+	if req.DepartamentoID != nil && req.Departamento != nil {
+		h.errorHandler(c, app.Errorf(app.EINVALID, "Provide departamento_id OR departamento, not both"))
+		return
+	}
+
+	if req.DepartamentoID == nil && req.Departamento == nil {
+		h.errorHandler(c, app.Errorf(app.EINVALID, "Provide departamento_id or departamento"))
+		return
+	}
+
+	if req.Departamento != nil {
+		h.logger.Info("Creating colaborador with new departamento", zap.String("colaborador_name", req.Nome), zap.String("departamento_name", req.Departamento.Nome))
+
+		colaborador := &entities.Colaborador{
+			Nome: req.Nome,
+			CPF:  req.CPF,
+			RG:   req.RG,
+		}
+
+		departamento := &entities.Departamento{
+			Nome:                   req.Departamento.Nome,
+			GerenteID:              req.Departamento.GerenteID,
+			DepartamentoSuperiorID: req.Departamento.DepartamentoSuperiorID,
+		}
+
+		if err := h.colaboradorUseCase.CreateColaboradorWithDepartamento(colaborador, departamento); err != nil {
+			h.logger.Error("Failed to create colaborador with departamento", zap.Error(err), zap.String("colaborador_name", req.Nome))
+			h.errorHandler(c, err)
+			return
+		}
+
+		h.logger.Info("Colaborador and departamento created successfully", zap.String("colaborador_id", colaborador.ID.String()), zap.String("departamento_id", departamento.ID.String()))
+
+		c.JSON(http.StatusCreated, SuccessResponse{
+			Message: "Employee and department created successfully",
+			Data:    colaborador,
+		})
+		return
+	}
+
+	h.logger.Info("Creating colaborador with existing departamento", zap.String("colaborador_name", req.Nome), zap.String("departamento_id", req.DepartamentoID.String()))
 
 	colaborador := &entities.Colaborador{
 		Nome:           req.Nome,
 		CPF:            req.CPF,
 		RG:             req.RG,
-		DepartamentoID: req.DepartamentoID,
+		DepartamentoID: *req.DepartamentoID,
 	}
 
 	if err := h.colaboradorUseCase.CreateColaborador(colaborador); err != nil {
