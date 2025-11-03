@@ -16,6 +16,7 @@ import (
 	"github.com/lkgiovani/growth_technical_challenge/internal/usecases/departamento"
 
 	"github.com/lkgiovani/growth_technical_challenge/internal/repository"
+	"github.com/lkgiovani/growth_technical_challenge/internal/services/cache_service"
 	pkgCache "github.com/lkgiovani/growth_technical_challenge/pkg/cache"
 	"github.com/lkgiovani/growth_technical_challenge/pkg/logger"
 	"go.uber.org/fx"
@@ -29,6 +30,7 @@ var Module = fx.Options(
 		NewLogger,
 		NewDatabase,
 		NewRedisClient,
+		NewCacheService,
 		NewRouter,
 		NewLoggerMiddleware,
 		NewRecoveryMiddleware,
@@ -130,35 +132,39 @@ func NewRecoveryMiddleware(log logger.Logger) RecoveryMiddleware {
 	return RecoveryMiddleware(middleware.Recovery(log))
 }
 
-func NewColaboradorRepository(db *gorm.DB, cache pkgCache.Cache, log logger.Logger) repository.ColaboradorRepository {
+func NewCacheService(cache pkgCache.Cache, log logger.Logger) cache_service.CacheService {
 	if cache == nil {
-		log.Warn("Cache not available for Colaborador, using repository without cache")
+		log.Warn("Cache not available, cache service will operate in pass-through mode")
 	}
-	return repository.NewColaboradorRepository(db, cache, log)
+	return cache_service.NewCacheService(cache, log)
 }
 
-func NewDepartamentoRepository(db *gorm.DB, cache pkgCache.Cache, log logger.Logger) repository.DepartamentoRepository {
-	if cache == nil {
-		log.Warn("Cache not available for Departamento, using repository without cache")
-	}
-	return repository.NewDepartamentoRepository(db, cache, log)
+func NewColaboradorRepository(db *gorm.DB, log logger.Logger) repository.ColaboradorRepository {
+	return repository.NewColaboradorRepository(db, log)
+}
+
+func NewDepartamentoRepository(db *gorm.DB, log logger.Logger) repository.DepartamentoRepository {
+	return repository.NewDepartamentoRepository(db, log)
 }
 
 func NewColaboradorUseCase(
 	colaboradorRepo repository.ColaboradorRepository,
 	departamentoRepo repository.DepartamentoRepository,
+	cacheService cache_service.CacheService,
+	db *gorm.DB,
 	log logger.Logger,
 ) colaborador.UseCase {
-	return colaborador.NewUseCase(colaboradorRepo, departamentoRepo, log)
+	return colaborador.NewUseCase(colaboradorRepo, departamentoRepo, cacheService, db, log)
 }
 
 func NewDepartamentoUseCase(
 	departamentoRepo repository.DepartamentoRepository,
 	colaboradorRepo repository.ColaboradorRepository,
+	cacheService cache_service.CacheService,
 	db *gorm.DB,
 	log logger.Logger,
 ) departamento.UseCase {
-	return departamento.NewUseCase(departamentoRepo, colaboradorRepo, db, log)
+	return departamento.NewUseCase(departamentoRepo, colaboradorRepo, cacheService, db, log)
 }
 
 type RouteParams struct {
